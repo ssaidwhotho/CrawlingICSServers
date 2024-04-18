@@ -1,5 +1,6 @@
 import os
 import shelve
+import random
 
 from threading import Thread, RLock
 from queue import Queue, Empty
@@ -49,7 +50,10 @@ class Frontier(object):
 
     def get_tbd_url(self):
         try:
-            return self.to_be_downloaded.pop()
+            random_url = random.choice(self.to_be_downloaded) # Randomly select a URL from the list to avoid running the same website over
+            self.to_be_downloaded.remove(random_url)
+            return random_url
+            #return self.to_be_downloaded.pop()  # This is the old code is randomly selecting a URL doesn't work well
         except IndexError:
             return None
 
