@@ -6,6 +6,25 @@ import lxml
 import time
 
 
+def count_page_words(url, soup, counter_object):
+    # Count the words in the page
+    text = soup.get_text()
+    words = re.findall(r'\w+', text.lower())
+    word_count = len(words) # Increment the word count
+    counter_object.increment_words(words)
+
+    # Check if the page is the longest page
+    if word_count > counter_object.get_longest_page_count():
+        counter_object.set_longest_page(url, word_count)
+    return
+
+def count_if_ics_subdomain(url, counter_object):
+    # Count the number of pages that are in the ics subdomain
+    parsed = urlparse(url)
+    if parsed.netloc.endswith(".ics.uci.edu"):
+        counter_object.increment_ics_subdomains(parsed.netloc)
+    return
+
 
 ### robot parser
 def can_parse(url) -> bool:
@@ -31,17 +50,17 @@ def can_parse(url) -> bool:
 
 
 
-def scraper(url, resp):
+def scraper(url, resp, counter_object):
     # TODO: I think we should use can_parse() here instead of inside is_valid()
-    links = extract_next_links(url, resp)
+    links = extract_next_links(url, resp, counter_object)
     links = [link for link in links if is_valid(link)]
     links = list(set(urldefrag(link).url for link in links))
-    # TODO: Add to the total counts here: Unique pages, subdomains in ics.uci.edu domain
-    # TODO: For ics.uci.edu subdomains, make a dictionary with the subdomain as the key and the count of unique pages reached from that as the value
+    counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
+    count_if_ics_subdomain(url, counter_object)
     # TODO MAYBE: Save the URL and webpage on the local disk
     return links
 
-def extract_next_links(url, resp):
+def extract_next_links(url, resp, counter_object):
     # Implementation required.
     # url: the URL that was used to get the page
     # resp.url: the actual url of the page
@@ -55,7 +74,7 @@ def extract_next_links(url, resp):
     if resp.error is None: # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-            # TODO: Counting of individual words should be done here
+            count_page_words(url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
