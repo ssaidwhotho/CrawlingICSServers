@@ -1,8 +1,9 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse, urljoin
 from urllib.robotparser import RobotFileParser as RobotParser
 from bs4 import BeautifulSoup, SoupStrainer
 import lxml
+import time
 
 
 
@@ -16,11 +17,17 @@ def can_parse(url) -> bool:
 
     '''
     allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
-    robot_parse = RobotParser()
-    robots_url = url.scheme + "://" + url.netloc + "/robots.txt"
-    robot_parse.set_url(robots_url)
-    robot_parse.read()
-    return robot_parse.can_fetch("*", url) and url.netloc in allowed_net_locs
+    print("/t this is the url: ", url)
+    try:
+        robot_parse = RobotParser()
+        parsed_url = urlparse(url)
+        print(parsed_url)
+        robots_url = parsed_url.scheme + "://" + parsed_url.netloc + "/robots.txt"
+        robot_parse.set_url(robots_url)
+        robot_parse.read()
+        return robot_parse.can_fetch("*", url) and any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs)
+    except ValueError:
+        return False
 
 
 
@@ -49,8 +56,10 @@ def extract_next_links(url, resp):
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
-                    links.add(link)
-                    print(f'Linked added successfully! {link}')
+                    link = urljoin(url, link)
+                    if is_valid(link):
+                        links.add(link)
+                        print(f'Linked added successfully! {link}')
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
@@ -60,7 +69,7 @@ def extract_next_links(url, resp):
 
 
 def is_valid(url):
-    # Decide whether to crawl this url or not. 
+    # Decide whether to crawl this url or not.
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
     try:
