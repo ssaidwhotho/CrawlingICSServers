@@ -1,7 +1,6 @@
 import re
-from urllib.parse import urlparse, urlunparse, urljoin
+from urllib.parse import urlparse, urlunparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
-from urllib.parse import urldefrag
 from bs4 import BeautifulSoup, SoupStrainer
 import lxml
 import time
@@ -33,11 +32,13 @@ def can_parse(url) -> bool:
 
 
 def scraper(url, resp):
-    # TODO: Add a check to make sure that we are allowed to check the url
+    # TODO: I think we should use can_parse() here instead of inside is_valid()
     links = extract_next_links(url, resp)
     links = [link for link in links if is_valid(link)]
-    # TODO: Remove the fragment part of the URL (ie: the #bbb in http://www.ics.uci.edu#bbb)
     links = list(set(urldefrag(link).url for link in links))
+    # TODO: Add to the total counts here: Unique pages, subdomains in ics.uci.edu domain
+    # TODO: For ics.uci.edu subdomains, make a dictionary with the subdomain as the key and the count of unique pages reached from that as the value
+    # TODO MAYBE: Save the URL and webpage on the local disk
     return links
 
 def extract_next_links(url, resp):
@@ -54,6 +55,7 @@ def extract_next_links(url, resp):
     if resp.error is None: # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+            # TODO: Counting of individual words should be done here
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
@@ -77,12 +79,13 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        if can_parse(url):
-            return not re.match( # TODO: Change this to only allow *.ics.uci.edu/*, *.cs.uci.edu/*, *.informatics.uci.edu/*, *.stat.uci.edu/*
+        if can_parse(url): # TODO: can_parse() def should go AFTER this following check to make sure it's a webpage
+            if not any(domain in parsed.netloc for domain in
+                       [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]):
+                return False
+            return not re.match(
                 r".*\.(css|js|bmp|gif|jpe?g|ico"
                 + r"|png|tiff?|mid|mp2|mp3|mp4"
-                # specifc to ics
-                # + r"|ics|cs|informatics|stat)\.uci\.edu"
                 + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
                 + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
                 + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
