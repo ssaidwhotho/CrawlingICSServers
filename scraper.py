@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse, urlunparse, urljoin
 from urllib.robotparser import RobotFileParser as RobotParser
+from urllib.parse import urldefrag
 from bs4 import BeautifulSoup, SoupStrainer
 import lxml
 import time
@@ -36,7 +37,7 @@ def scraper(url, resp):
     links = extract_next_links(url, resp)
     links = [link for link in links if is_valid(link)]
     # TODO: Remove the fragment part of the URL (ie: the #bbb in http://www.ics.uci.edu#bbb)
-    #  urllib.parse.urldefrag(url)¶
+    links = list(set(urldefrag(link).url for link in links))
     return links
 
 def extract_next_links(url, resp):
