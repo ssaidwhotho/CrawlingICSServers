@@ -74,3 +74,8 @@ class CounterObject:
 
     def get_longest_page_url(self):
         return self.longest_page[0]
+
+    def get_50_most_common_words(self):
+        # Returns a sorted dict starting from the most common word
+        self.remove_stopwords()
+        return dict(sorted(self.word_count.items(), key=lambda item: item[1], reverse=True)[:50])

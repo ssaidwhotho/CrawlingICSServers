@@ -18,6 +18,7 @@ def count_page_words(url, soup, counter_object):
         counter_object.set_longest_page(url, word_count)
     return
 
+
 def count_if_ics_subdomain(url, counter_object):
     # Count the number of pages that are in the ics subdomain
     parsed = urlparse(url)
