@@ -7,9 +7,16 @@ import lxml
 import time
 
 
+def size_check(soup): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
+    MAX_FILE_SIZE = 10 * 1024 * 1024 # == 10mb
+    # TODO: Get content length of the page in mb
+    # TODO: Find a way to check if the information is of low or high value
+    #return content_length > MAX_FILE_SIZE
+
+
 def check_redirects(url):
     response = requests.get(url, allow_redirects = True)
-    if (url != response.url):
+    if url != response.url:
         return response.url
     return None
 
