@@ -2,8 +2,16 @@ import re
 from urllib.parse import urlparse, urlunparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
 from bs4 import BeautifulSoup, SoupStrainer
+import requests
 import lxml
 import time
+
+
+def check_redirects(url):
+    response = requests.get(url, allow_redirects = True)
+    if (url != response.url):
+        return response.url
+    return None
 
 
 def count_page_words(url, soup, counter_object):
@@ -54,6 +62,11 @@ def can_parse(url) -> bool:
 def scraper(url, resp, counter_object):
     # TODO: I think we should use can_parse() here instead of inside is_valid()
     links = extract_next_links(url, resp, counter_object)
+
+    redirect_link = check_redirects(url) # Check if there was a redirect, if so append to links
+    if redirect_link is not None:
+        links.append(redirect_link)
+
     links = [link for link in links if is_valid(link)]
     links = list(set(urldefrag(link).url for link in links))
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
