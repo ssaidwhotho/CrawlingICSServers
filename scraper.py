@@ -7,11 +7,32 @@ import lxml
 import time
 
 
-def size_check(soup): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
+def bad_size(soup): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
+    # Returns True if the file is too big or empty, else False
     MAX_FILE_SIZE = 10 * 1024 * 1024 # == 10mb
     # TODO: Get content length of the page in mb
     # TODO: Find a way to check if the information is of low or high value
-    #return content_length > MAX_FILE_SIZE
+    content_length = len(soup.body) # NOT SURE IF THIS WORKS TBH
+    if content_length > MAX_FILE_SIZE:
+        return True
+
+    # TODO: Check if the file is empty
+    if content_length == 0 or len(soup.title) == 0:
+        return True
+    return False
+
+
+def similarity_score(a, b): # A similarity checker I found online that might work
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def too_similar(soup, visited_contents): # Return True if the page is too similar to any prev. page
+    # TODO: Find a way to feed this function all the previously visited page contents.
+
+    if any(similarity_score(soup, visited_content) > 0.9 for visited_content in visited_contents): # 0.9 is 90% similar
+        return True
+    return False
 
 
 def check_redirects(url):
