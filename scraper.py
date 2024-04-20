@@ -1,8 +1,9 @@
 import re
 from urllib.parse import urlparse, urlunparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
+from urllib.error import URLError
 from bs4 import BeautifulSoup, SoupStrainer
-import requests
+from ssl import SSLCertVerificationError
 import lxml
 import time
 
@@ -35,13 +36,6 @@ def too_similar(soup, visited_contents): # Return True if the page is too simila
     return False
 
 
-def check_redirects(url):
-    response = requests.get(url, allow_redirects = True)
-    if url != response.url:
-        return response.url
-    return None
-
-
 def count_page_words(url, soup, counter_object):
     # Count the words in the page
     text = soup.get_text()
@@ -52,7 +46,6 @@ def count_page_words(url, soup, counter_object):
     # Check if the page is the longest page
     if word_count > counter_object.get_longest_page_count():
         counter_object.set_longest_page(url, word_count)
-    return
 
 
 def count_if_ics_subdomain(url, counter_object):
@@ -60,7 +53,6 @@ def count_if_ics_subdomain(url, counter_object):
     parsed = urlparse(url)
     if parsed.netloc.endswith(".ics.uci.edu"):
         counter_object.increment_ics_subdomains(parsed.netloc)
-    return
 
 
 ### robot parser
@@ -73,33 +65,33 @@ def can_parse(url) -> bool:
 
     '''
     allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
-    print("/t this is the url: ", url)
+    print("\t this is the url: ", url)
     try:
         robot_parse = RobotParser()
         parsed_url = urlparse(url)
         print(parsed_url)
+        if (not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs)):
+            return False
         robots_url = parsed_url.scheme + "://" + parsed_url.netloc + "/robots.txt"
         robot_parse.set_url(robots_url)
         robot_parse.read()
-        return robot_parse.can_fetch("*", url) and any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs)
-    except ValueError:
+        return robot_parse.can_fetch("*", url)
+    except URLError or SSLCertVerificationError:
+        print("\n\ni errored\n\n")
         return False
+
 
 
 
 def scraper(url, resp, counter_object):
     # TODO: I think we should use can_parse() here instead of inside is_valid()
     links = extract_next_links(url, resp, counter_object)
-
-    redirect_link = check_redirects(url) # Check if there was a redirect, if so append to links
-    if redirect_link is not None:
-        links.append(redirect_link)
-
     links = [link for link in links if is_valid(link)]
-    links = list(set(urldefrag(link).url for link in links))
+    links = list(set(urldefrag(link).url for link in links)) # defraged url!
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
     # TODO MAYBE: Save the URL and webpage on the local disk
+    # no
     return links
 
 def extract_next_links(url, resp, counter_object):
@@ -113,6 +105,8 @@ def extract_next_links(url, resp, counter_object):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     links = set()
+    """ TODO: if the website is taking forever to load, we should just leave it
+    -   thinking of just setting a timer and if it overlaps"""
     if resp.error is None: # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
@@ -141,9 +135,7 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
         if can_parse(url): # TODO: can_parse() def should go AFTER this following check to make sure it's a webpage
-            if not any(domain in parsed.netloc for domain in
-                       [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]):
-                return False
+            # louie deleted cus I already check it in can_parse
             return not re.match(
                 r".*\.(css|js|bmp|gif|jpe?g|ico"
                 + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -153,7 +145,9 @@ def is_valid(url):
                 + r"|epub|dll|cnf|tgz|sha1"
                 + r"|thmx|mso|arff|rtf|jar|csv"
                 + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+        else:
+            print("\n\nit failed i am the worst coder.\n\n")
 
-    except TypeError:
+    except TypeError or URLError:
         print ("TypeError for ", parsed)
         raise
