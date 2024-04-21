@@ -24,21 +24,9 @@ def bad_size(soup): # TODO: Haven't implemented yet, but want to put it in can_p
     return False
 
 
-# def similarity_score(a, b): # A similarity checker I found online that might work
-#     from difflib import SequenceMatcher
-#     return SequenceMatcher(None, a, b).ratio()
-
-#
-# def too_similar(soup, visited_contents): # Return True if the page is too similar to any prev. page
-#     # TODO: Find a way to feed this function all the previously visited page contents.
-#
-#     if any(similarity_score(soup, visited_content) > 0.9 for visited_content in visited_contents): # 0.9 is 90% similar
-#         return True
-#     return False
-
-
 def count_page_words(url, soup, counter_object):
     # Count the words in the page
+    # TODO: check if this saves correctly and save locally
     text = soup.get_text()
     words = re.findall(r'\w+', text.lower())
     word_count = len(words) # Increment the word count
@@ -51,22 +39,21 @@ def count_page_words(url, soup, counter_object):
 
 def count_if_ics_subdomain(url, counter_object):
     # Count the number of pages that are in the ics subdomain
+    # TODO: check if this saves correctly and save locally
     parsed = urlparse(url)
     if parsed.netloc.endswith(".ics.uci.edu"):
         counter_object.increment_ics_subdomains(parsed.netloc)
 
 
-### robot parser
 def can_parse(url) -> bool:
-    '''
+    """
     Gets the url and checks its robot.txt to see if we are allowed to crawl :emoji_face:
 
     :param url -> namedTuple a url that is parsed through urlparse
     :return: bool of whether the crawler is allowed to search the url
 
-    '''
+    """
     allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
-    # print("\t this is the url: ", url)
     try:
         robot_parse = RobotParser()
         parsed_url = urlparse(url)
@@ -88,41 +75,28 @@ def url_similarity(url1, url2):
 
     # Calculate similarity for each component of the URLs
     domain_similarity = SequenceMatcher(None, parsed_url1.netloc, parsed_url2.netloc).ratio()
+    if (domain_similarity != 1): # the domains have to be similar to be the same
+        return 0
     path_similarity = SequenceMatcher(None, parsed_url1.path, parsed_url2.path).ratio()
     query_similarity = SequenceMatcher(None, parsed_url1.query, parsed_url2.query).ratio()
 
     # Calculate overall similarity as an average of component similarities
     overall_similarity = (domain_similarity + path_similarity + query_similarity) / 3
 
-    return overall_similarity
+    if overall_similarity >= 0.9:
+        print(f'THE SIMILARITY BETWEEN THESE TWO ARE THE SAME: {url1} -> {url2}')
 
-def get_rid_of_similars(links: list):
-    n = len(links)
-    i = 0
-    while i < n:
-        j = i + 1
-        while j < n:
-            if (url_similarity(links[i], links[j])) > 0.9:
-                print(f"\n\ni'm deleting one of the urls: {links[j]}\n\n")
-                del links[j]
-                n -= 1
-            else:
-                j += 1
-        i += 1
+    return overall_similarity
 
 
 def scraper(url, resp, counter_object):
     print(f'\n\nTIME TO SCRAPE!!\n\n')
-    # TODO: I think we should use can_parse() here instead of inside is_valid()
     links = extract_next_links(url, resp, counter_object)
-    # got rid of extra is valid check since we call it in extract_next_links
-    print("\n\nTIME TO GET RID OF SIMILAR LINKS!\n\n")
-    get_rid_of_similars(links)
     links = list(set(urldefrag(link).url for link in links)) # defraged url!
+    # TODO: check if this saves correctly and save locally
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
     # TODO MAYBE: Save the URL and webpage on the local disk
-    # no
     return links
 
 def extract_next_links(url, resp, counter_object):
@@ -146,7 +120,13 @@ def extract_next_links(url, resp, counter_object):
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
-                    if is_valid(link):
+                    similar = False
+                    for the_url in links:
+                        if url_similarity(the_url, link) > 0.9:
+                            print(f'\n\nJUST TO CHECK BUT THIS IS SIMILAR: {the_url}, {link} :(\n\n')
+                            similar = True
+                            break
+                    if is_valid(link) and not similar: # checking for similarities
                         links.add(link)
                         print(f'Linked added successfully! {link}')
                     else:
@@ -165,13 +145,15 @@ def is_valid(url):
     # There are already some conditions that return False.
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in set(["http", "https"]):
+        if parsed.scheme not in {"http", "https"}:
             return False
-        if 'embed' in parsed.path:  # Check if 'embed?url' is present in the query string
+        if 'embed' in parsed.path.lower():  # Check if 'embed?url' is present in the query string
             return False
-        if 'json' in parsed.path: # check for json websites
+        if 'wp-json' in parsed.path.lower(): # check for json websites
             return False
-        if '\\' in parsed.path: # check for weird escape symbol urls
+        if '\\' in parsed.path.lower(): # check for weird escape symbol urls
+            return False
+        if "php" in parsed.path.lower(): # php checking but re.match might already do this
             return False
         if can_parse(url): # TODO: can_parse() def should go AFTER this following check to make sure it's a webpage
             # louie deleted cus I already check it in can_parse
@@ -185,7 +167,7 @@ def is_valid(url):
                 + r"|thmx|mso|arff|rtf|jar|csv"
                 + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|xml|json)$", parsed.path.lower())
         else:
-            print("\n\nit failed i am the worst coder.\n\n")
+            print("\n\nit is not parseable i am the worst coder.\n\n")
 
     except TypeError or URLError:
         print ("TypeError for ", parsed)
