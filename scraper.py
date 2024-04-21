@@ -4,6 +4,7 @@ from urllib.robotparser import RobotFileParser as RobotParser
 from urllib.error import URLError
 from bs4 import BeautifulSoup, SoupStrainer
 from ssl import SSLCertVerificationError
+from difflib import SequenceMatcher
 import lxml
 import time
 
@@ -23,17 +24,17 @@ def bad_size(soup): # TODO: Haven't implemented yet, but want to put it in can_p
     return False
 
 
-def similarity_score(a, b): # A similarity checker I found online that might work
-    from difflib import SequenceMatcher
-    return SequenceMatcher(None, a, b).ratio()
+# def similarity_score(a, b): # A similarity checker I found online that might work
+#     from difflib import SequenceMatcher
+#     return SequenceMatcher(None, a, b).ratio()
 
-
-def too_similar(soup, visited_contents): # Return True if the page is too similar to any prev. page
-    # TODO: Find a way to feed this function all the previously visited page contents.
-
-    if any(similarity_score(soup, visited_content) > 0.9 for visited_content in visited_contents): # 0.9 is 90% similar
-        return True
-    return False
+#
+# def too_similar(soup, visited_contents): # Return True if the page is too similar to any prev. page
+#     # TODO: Find a way to feed this function all the previously visited page contents.
+#
+#     if any(similarity_score(soup, visited_content) > 0.9 for visited_content in visited_contents): # 0.9 is 90% similar
+#         return True
+#     return False
 
 
 def count_page_words(url, soup, counter_object):
@@ -65,7 +66,7 @@ def can_parse(url) -> bool:
 
     '''
     allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
-    print("\t this is the url: ", url)
+    # print("\t this is the url: ", url)
     try:
         robot_parse = RobotParser()
         parsed_url = urlparse(url)
@@ -80,13 +81,43 @@ def can_parse(url) -> bool:
         print("\n\ni errored\n\n")
         return False
 
+def url_similarity(url1, url2):
+    # Parse the URLs
+    parsed_url1 = urlparse(url1)
+    parsed_url2 = urlparse(url2)
 
+    # Calculate similarity for each component of the URLs
+    domain_similarity = SequenceMatcher(None, parsed_url1.netloc, parsed_url2.netloc).ratio()
+    path_similarity = SequenceMatcher(None, parsed_url1.path, parsed_url2.path).ratio()
+    query_similarity = SequenceMatcher(None, parsed_url1.query, parsed_url2.query).ratio()
+
+    # Calculate overall similarity as an average of component similarities
+    overall_similarity = (domain_similarity + path_similarity + query_similarity) / 3
+
+    return overall_similarity
+
+def get_rid_of_similars(links: list):
+    n = len(links)
+    i = 0
+    while i < n:
+        j = i + 1
+        while j < n:
+            if (url_similarity(links[i], links[j])) > 0.9:
+                print(f"\n\ni'm deleting one of the urls: {links[j]}\n\n")
+                del links[j]
+                n -= 1
+            else:
+                j += 1
+        i += 1
 
 
 def scraper(url, resp, counter_object):
+    print(f'\n\nTIME TO SCRAPE!!\n\n')
     # TODO: I think we should use can_parse() here instead of inside is_valid()
     links = extract_next_links(url, resp, counter_object)
-    links = [link for link in links if is_valid(link)]
+    # got rid of extra is valid check since we call it in extract_next_links
+    print("\n\nTIME TO GET RID OF SIMILAR LINKS!\n\n")
+    get_rid_of_similars(links)
     links = list(set(urldefrag(link).url for link in links)) # defraged url!
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
@@ -110,14 +141,16 @@ def extract_next_links(url, resp, counter_object):
     if resp.error is None: # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-            count_page_words(url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
+            count_page_words(resp.url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
-                    link = urljoin(url, link)
+                    link = urljoin(resp.url, link)
                     if is_valid(link):
                         links.add(link)
                         print(f'Linked added successfully! {link}')
+                    else:
+                        print(f'\n\nLink not valid {link}\n\n')
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
@@ -134,6 +167,12 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        if 'embed' in parsed.path:  # Check if 'embed?url' is present in the query string
+            return False
+        if 'json' in parsed.path: # check for json websites
+            return False
+        if '\\' in parsed.path: # check for weird escape symbol urls
+            return False
         if can_parse(url): # TODO: can_parse() def should go AFTER this following check to make sure it's a webpage
             # louie deleted cus I already check it in can_parse
             return not re.match(
@@ -144,10 +183,9 @@ def is_valid(url):
                 + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
                 + r"|epub|dll|cnf|tgz|sha1"
                 + r"|thmx|mso|arff|rtf|jar|csv"
-                + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+                + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|xml|json)$", parsed.path.lower())
         else:
             print("\n\nit failed i am the worst coder.\n\n")
 
     except TypeError or URLError:
         print ("TypeError for ", parsed)
-        raise
