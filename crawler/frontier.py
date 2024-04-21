@@ -59,7 +59,7 @@ class Frontier(object):
     def add_url(self, url):
         url = normalize(url)
         urlhash = get_urlhash(url)
-        if urlhash not in self.save and urlhash not in self.previously_visited:
+        if urlhash not in self.save and urlhash not in self.previously_visited:  # don't put in if seen before
             self.save[urlhash] = (url, False)
             self.save.sync()
             self.to_be_downloaded.append(url)
@@ -72,5 +72,5 @@ class Frontier(object):
                 f"Completed url {url}, but have not seen it before.")
 
         self.save[urlhash] = (url, True)
-        self.previously_visited.add(urlhash)
+        self.previously_visited.add(urlhash)  # adds the urlhash to mark it as visited
         self.save.sync()
