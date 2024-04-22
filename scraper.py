@@ -28,7 +28,7 @@ def save_page_data(url, soup, counter_object):
     # Count the words in the page
     # TODO: check if this saves correctly and save locally
     text = soup.get_text()
-    words = re.findall(r"\b\w+\b|\b\w+\'+\w+\b", text.lower())
+    words = re.findall(r"\b[\w\’\.\']+\b", text.lower())
     word_count = len(words) # Increment the word count
     counter_object.add_new_page(url, words)
     counter_object.increment_words(words)
