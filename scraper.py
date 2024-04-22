@@ -79,6 +79,8 @@ def too_similar(url, soup, counter_object):
             print(f'THE SIMILARITY BETWEEN THESE TWO IS >= 80%: {url} -> {prev_url}')
             return True
 
+    return False
+
 
 def scraper(url, resp, counter_object):
     print(f'\n\nTIME TO SCRAPE!!\n\n')

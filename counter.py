@@ -30,6 +30,15 @@ class CounterObject:
 
     def add_new_page(self, url, word_list):
         self.all_page_data[url] = word_list
+        with open("data.txt", "a+") as f:
+            f.write(f"{url}: {word_list}\n\n\n\n")
+
+        with open("allInfo.txt", "w+") as f1:
+            f1.write(f"Unique Pages: {self.unique_pages}\n\n")
+            f1.write(f"Longest Page: {self.longest_page}\n\n")
+            f1.write(f"50 Most Common Words: {self.get_50_most_common_words()}\n\n")
+            f1.write(f"ICS Subdomains: {self.ics_subdomains}\n\n")
+            f1.write(f"Word Count: {self.word_count}\n\n")
 
 
     def increment_unique_pages(self):

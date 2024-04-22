@@ -20,7 +20,7 @@ def main(config_file, restart):
 if __name__ == "__main__":
     ############################################## DELETE
     start_time = time.time()
-    max_time = 10 # Set timeout to 10 seconds
+    max_time = 10  # Set timeout to 10 seconds
     while time.time() - start_time < max_time:
         parser = ArgumentParser()
         parser.add_argument("--restart", action = "store_true", default = False)
