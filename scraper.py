@@ -9,27 +9,28 @@ import lxml
 import time
 
 
-def bad_size(soup): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
+def bad_size(url): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
     # Returns True if the file is too big or empty, else False
     MAX_FILE_SIZE = 10 * 1024 * 1024 # == 10mb
     # TODO: Get content length of the page in mb
     # TODO: Find a way to check if the information is of low or high value
-    content_length = len(soup.body) # NOT SURE IF THIS WORKS TBH
+    content_length = len(url) # Placeholder for now
     if content_length > MAX_FILE_SIZE:
         return True
 
     # TODO: Check if the file is empty
-    if content_length == 0 or len(soup.title) == 0:
+    if content_length == 0 or len(url.title) == 0: # Placeholder for now
         return True
     return False
 
 
-def count_page_words(url, soup, counter_object):
+def save_page_data(url, soup, counter_object):
     # Count the words in the page
     # TODO: check if this saves correctly and save locally
     text = soup.get_text()
     words = re.findall(r'\w+', text.lower())
     word_count = len(words) # Increment the word count
+    counter_object.add_new_page(url, words)
     counter_object.increment_words(words)
 
     # Check if the page is the longest page
@@ -68,36 +69,35 @@ def can_parse(url) -> bool:
         print("\n\ni errored\n\n")
         return False
 
-def url_similarity(url1, url2):
-    # Parse the URLs
-    parsed_url1 = urlparse(url1)
-    parsed_url2 = urlparse(url2)
+def too_similar(url, soup, counter_object):
+    text = soup.get_text()
+    words = re.findall(r'\w+', text.lower())
 
-    # Calculate similarity for each component of the URLs
-    domain_similarity = SequenceMatcher(None, parsed_url1.netloc, parsed_url2.netloc).ratio()
-    if (domain_similarity != 1): # the domains have to be similar to be the same
-        return 0
-    path_similarity = SequenceMatcher(None, parsed_url1.path, parsed_url2.path).ratio()
-    query_similarity = SequenceMatcher(None, parsed_url1.query, parsed_url2.query).ratio()
-
-    # Calculate overall similarity as an average of component similarities
-    overall_similarity = (domain_similarity + path_similarity + query_similarity) / 3
-
-    if overall_similarity >= 0.9:
-        print(f'THE SIMILARITY BETWEEN THESE TWO ARE THE SAME: {url1} -> {url2}')
-
-    return overall_similarity
+    for prev_url in counter_object.get_prev_urls():
+        prev_words = counter_object.get_prev_url_data(prev_url)
+        if SequenceMatcher(None, words, prev_words).ratio() >= 0.85:
+            print(f'THE SIMILARITY BETWEEN THESE TWO IS >= 80%: {url} -> {prev_url}')
+            return True
 
 
 def scraper(url, resp, counter_object):
     print(f'\n\nTIME TO SCRAPE!!\n\n')
     links = extract_next_links(url, resp, counter_object)
+    if not links:
+        return []
     links = list(set(urldefrag(link).url for link in links)) # defraged url!
+
+#    for link in links[:]: TODO: This will be where we check bad_size() once we finish it
+#        if bad_size(link):
+#            links.remove(link)
+#            print(f'\n\nLink is bad size: {link}\n\n')
+
     # TODO: check if this saves correctly and save locally
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
     # TODO MAYBE: Save the URL and webpage on the local disk
     return links
+
 
 def extract_next_links(url, resp, counter_object):
     # Implementation required.
@@ -115,18 +115,19 @@ def extract_next_links(url, resp, counter_object):
     if resp.error is None: # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-            count_page_words(resp.url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
+
+
+            if too_similar(url, soup, counter_object): # Check if the page is too similar to another page before reading it
+                return links
+
+
+            save_page_data(resp.url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
+
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
-                    similar = False
-                    for the_url in links:
-                        if url_similarity(the_url, link) > 0.9:
-                            print(f'\n\nJUST TO CHECK BUT THIS IS SIMILAR: {the_url}, {link} :(\n\n')
-                            similar = True
-                            break
-                    if is_valid(link) and not similar: # checking for similarities
+                    if is_valid(link): # checking for similarities
                         links.add(link)
                         print(f'Linked added successfully! {link}')
                     else:
@@ -155,19 +156,19 @@ def is_valid(url):
             return False
         if "php" in parsed.path.lower(): # php checking but re.match might already do this
             return False
-        if can_parse(url): # TODO: can_parse() def should go AFTER this following check to make sure it's a webpage
             # louie deleted cus I already check it in can_parse
-            return not re.match(
-                r".*\.(css|js|bmp|gif|jpe?g|ico"
-                + r"|png|tiff?|mid|mp2|mp3|mp4"
-                + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-                + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
-                + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-                + r"|epub|dll|cnf|tgz|sha1"
-                + r"|thmx|mso|arff|rtf|jar|csv"
-                + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|xml|json)$", parsed.path.lower())
+        if re.match(
+            r".*\.(css|js|bmp|gif|jpe?g|ico"
+            + r"|png|tiff?|mid|mp2|mp3|mp4"
+            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
+            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
+            + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
+            + r"|epub|dll|cnf|tgz|sha1"
+            + r"|thmx|mso|arff|rtf|jar|csv"
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|xml|json)$", parsed.path.lower()):
+            return False
         else:
-            print("\n\nit is not parseable i am the worst coder.\n\n")
+            return can_parse(url)
 
     except TypeError or URLError:
         print ("TypeError for ", parsed)
