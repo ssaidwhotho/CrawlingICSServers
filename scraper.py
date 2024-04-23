@@ -64,7 +64,7 @@ def too_similar(soup, counter_object) -> bool:
     for script in soup(["script", "style"]):
         script.decompose()
     content = [text.lower().split() for text in soup.stripped_strings]
-    content = [word for sublist in content for word in sublist]
+    content = [word.lower() for sublist in content for word in sublist]
     # get rid of all punctuation
     content = [re.sub(r'[^\w\s]', '', word) for word in content]
     word_dict = counter_object.get_all_words(content)
@@ -118,11 +118,7 @@ def extract_next_links(url, resp, counter_object) -> list:
                 print("\n\nit's too big tbh\n\nß")
                 return []
 
-            text_elements = soup.find_all('p') # not high textual content
-            total_text_length = sum(len(element.text) for element in text_elements)
-            if total_text_length < 1000:
-                print("\n\nit's too small tbh\n\nß")
-                return []
+            # TODO: find what's not enough textual information?
 
             save_page_data(resp.url, soup,
                            counter_object)  # Count the words in the page, also checks if it's the longest page
@@ -133,7 +129,7 @@ def extract_next_links(url, resp, counter_object) -> list:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
                     # check if valid link and if similar to any link
-                    similar = True if any(similarity_score(link, prev_link) >= 0.8 for prev_link in links) else False
+                    similar = True if any(similarity_score(link, prev_link) >= 0.9 for prev_link in links) else False
                     if is_valid(link) and not similar:
                         links.add(link)
                         print(f'Linked added successfully! {link}')

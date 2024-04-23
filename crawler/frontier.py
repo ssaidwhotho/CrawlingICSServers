@@ -63,7 +63,7 @@ class Frontier(object):
         # check similarity of url to previously visited urls via levenstein distance
         for prev_url in self.to_be_downloaded:
             similarity = similarity_score(url, prev_url)
-            if similarity >= 0.8:
+            if similarity >= 0.9:
                 print(f"\n\n URL SIMILARITY DETECTED {url} \n\n") # delete soon
                 return
         urlhash = get_urlhash(url)

@@ -133,7 +133,7 @@ class CounterObject:
                 similarity_ratio = count / 16
                 print("SIMILARITY = ", similarity_ratio)
                 # If the similarity ratio is greater than or equal to 0.8, return True
-                if similarity_ratio >= 0.8:
+                if similarity_ratio >= 0.9:
                     return True
             self.documents.add(bit_str)
             print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
