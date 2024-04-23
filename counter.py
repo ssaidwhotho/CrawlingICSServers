@@ -100,7 +100,10 @@ class CounterObject:
         word_dict = {}
         for word in content:
             if word not in self.stopwords:
-                word_dict[word] += 1 if word in word_dict else 1
+                if word in word_dict:
+                    word_dict[word] += 1
+                else:
+                    word_dict[word] = 1
         return word_dict
 
     def compare_bits(self, bits):
