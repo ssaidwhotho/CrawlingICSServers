@@ -52,7 +52,9 @@ class Frontier(object):
 
     def get_tbd_url(self):
         try:
-            return self.to_be_downloaded.pop()
+            random_file = random.choice(self.to_be_downloaded)
+            self.to_be_downloaded.remove(random_file)
+            return random_file
         except IndexError:
             return None
 
