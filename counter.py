@@ -1,5 +1,6 @@
 class CounterObject:
     def __init__(self):
+        self.all_page_data = {}
         self.unique_pages = 0
         self.ics_subdomains = {}
         self.word_count = {}
@@ -25,6 +26,19 @@ class CounterObject:
     "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
     "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
     "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
+
+
+    def add_new_page(self, url, word_list):
+        self.all_page_data[url] = word_list
+        with open("data.txt", "a+") as f:
+            f.write(f"{url}: {word_list}\n\n\n\n")
+
+        with open("allInfo.txt", "w+") as f1:
+            f1.write(f"Unique Pages: {self.unique_pages}\n\n")
+            f1.write(f"Longest Page: {self.longest_page}\n\n")
+            f1.write(f"50 Most Common Words: {self.get_50_most_common_words()}\n\n")
+            f1.write(f"ICS Subdomains: {self.ics_subdomains}\n\n")
+            f1.write(f"Word Count: {self.word_count}\n\n")
 
 
     def increment_unique_pages(self):
@@ -56,6 +70,12 @@ class CounterObject:
 
     def set_longest_page(self, url, word_count):
         self.longest_page = (url, word_count)
+
+    def get_prev_urls(self):
+        return self.all_page_data.keys()
+
+    def get_prev_url_data(self, url):
+        return self.all_page_data[url]
 
     def get_unique_pages(self):
         return self.unique_pages

@@ -1,22 +1,24 @@
 import re
 from urllib.parse import urlparse, urlunparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
+from urllib.error import URLError
 from bs4 import BeautifulSoup, SoupStrainer
+import requests
 import lxml
 import time
 
 
-def bad_size(soup): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
+def bad_size(url): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
     # Returns True if the file is too big or empty, else False
     MAX_FILE_SIZE = 10 * 1024 * 1024 # == 10mb
     # TODO: Get content length of the page in mb
     # TODO: Find a way to check if the information is of low or high value
-    content_length = len(soup.body) # NOT SURE IF THIS WORKS TBH
+    content_length = len(url) # Placeholder for now
     if content_length > MAX_FILE_SIZE:
         return True
 
     # TODO: Check if the file is empty
-    if content_length == 0 or len(soup.title) == 0:
+    if content_length == 0 or len(url.title) == 0: # Placeholder for now
         return True
     return False
 
@@ -34,72 +36,88 @@ def too_similar(soup, visited_contents): # Return True if the page is too simila
     return False
 
 
-# def check_redirects(url):
-#     response = requests.get(url, allow_redirects = True)
-#     if url != response.url:
-#         return response.url
-#     return None
+def check_redirects(url):
+    response = requests.get(url, allow_redirects = True)
+    if url != response.url:
+        return response.url
+    return None
 
 
 def count_page_words(url, soup, counter_object):
     # Count the words in the page
+    # TODO: check if this saves correctly and save locally
     text = soup.get_text()
-    words = re.findall(r'\w+', text.lower())
+    words = re.findall(r"\b[\w\’\.\']+\b", text.lower())
     word_count = len(words) # Increment the word count
+    counter_object.add_new_page(url, words)
     counter_object.increment_words(words)
 
     # Check if the page is the longest page
     if word_count > counter_object.get_longest_page_count():
         counter_object.set_longest_page(url, word_count)
-    return
 
 
 def count_if_ics_subdomain(url, counter_object):
     # Count the number of pages that are in the ics subdomain
+    # TODO: check if this saves correctly and save locally
     parsed = urlparse(url)
     if parsed.netloc.endswith(".ics.uci.edu"):
         counter_object.increment_ics_subdomains(parsed.netloc)
-    return
 
 
-### robot parser
 def can_parse(url) -> bool:
-    '''
+    """
     Gets the url and checks its robot.txt to see if we are allowed to crawl :emoji_face:
 
     :param url -> namedTuple a url that is parsed through urlparse
     :return: bool of whether the crawler is allowed to search the url
 
-    '''
+    """
     allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
-    print("/t this is the url: ", url)
     try:
         robot_parse = RobotParser()
         parsed_url = urlparse(url)
         print(parsed_url)
+        if (not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs)):
+            return False
         robots_url = parsed_url.scheme + "://" + parsed_url.netloc + "/robots.txt"
         robot_parse.set_url(robots_url)
         robot_parse.read()
-        return robot_parse.can_fetch("*", url) and any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs)
-    except ValueError:
+        return robot_parse.can_fetch("*", url)
+    except URLError or SSLCertVerificationError:
+        print("\n\ni errored\n\n")
         return False
 
+def too_similar(url, soup, counter_object):
+    text = soup.get_text()
+    words = re.findall(r'\w+', text.lower())
+
+    for prev_url in counter_object.get_prev_urls():
+        prev_words = counter_object.get_prev_url_data(prev_url)
+        if SequenceMatcher(None, words, prev_words).ratio() >= 0.85:
+            print(f'THE SIMILARITY BETWEEN THESE TWO IS >= 80%: {url} -> {prev_url}')
+            return True
+
+    return False
 
 
 def scraper(url, resp, counter_object):
-    # TODO: I think we should use can_parse() here instead of inside is_valid()
+    print(f'\n\nTIME TO SCRAPE!!\n\n')
     links = extract_next_links(url, resp, counter_object)
+    if not links:
+        return []
+    links = list(set(urldefrag(link).url for link in links)) # defraged url!
 
-    # redirect_link = check_redirects(url) # Check if there was a redirect, if so append to links
-    # if redirect_link is not None:
-    #     links.append(redirect_link)
+    redirect_link = check_redirects(url) # Check if there was a redirect, if so append to links
+    if redirect_link is not None:
+        links.append(redirect_link)
 
-    links = [link for link in links if is_valid(link)]
-    links = list(set(urldefrag(link).url for link in links))
+    # TODO: check if this saves correctly and save locally
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
     # TODO MAYBE: Save the URL and webpage on the local disk
     return links
+
 
 def extract_next_links(url, resp, counter_object):
     # Implementation required.
@@ -112,17 +130,28 @@ def extract_next_links(url, resp, counter_object):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
     links = set()
+    """ TODO: if the website is taking forever to load, we should just leave it
+    -   thinking of just setting a timer and if it overlaps"""
     if resp.error is None: # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-            count_page_words(url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
+
+
+            if too_similar(url, soup, counter_object): # Check if the page is too similar to another page before reading it
+                return links
+
+
+            save_page_data(resp.url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
+
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
-                    link = urljoin(url, link)
-                    if is_valid(link):
+                    link = urljoin(resp.url, link)
+                    if is_valid(link): # checking for similarities
                         links.add(link)
                         print(f'Linked added successfully! {link}')
+                    else:
+                        print(f'\n\nLink not valid {link}\n\n')
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
@@ -137,22 +166,29 @@ def is_valid(url):
     # There are already some conditions that return False.
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in set(["http", "https"]):
+        if parsed.scheme not in {"http", "https"}:
             return False
-        if can_parse(url): # TODO: can_parse() def should go AFTER this following check to make sure it's a webpage
-            if not any(domain in parsed.netloc for domain in
-                       [".ics.uci.edu", ".cs.uci.edu", ".informatics.uci.edu", ".stat.uci.edu"]):
-                return False
-            return not re.match(
-                r".*\.(css|js|bmp|gif|jpe?g|ico"
-                + r"|png|tiff?|mid|mp2|mp3|mp4"
-                + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-                + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
-                + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-                + r"|epub|dll|cnf|tgz|sha1"
-                + r"|thmx|mso|arff|rtf|jar|csv"
-                + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+        if 'embed' in parsed.path.lower():  # Check if 'embed?url' is present in the query string
+            return False
+        if 'wp-json' in parsed.path.lower(): # check for json websites
+            return False
+        if '\\' in parsed.path.lower(): # check for weird escape symbol urls
+            return False
+        if "php" in parsed.path.lower(): # php checking but re.match might already do this
+            return False
+            # louie deleted cus I already check it in can_parse
+        if re.match(
+            r".*\.(css|js|bmp|gif|jpe?g|ico"
+            + r"|png|tiff?|mid|mp2|mp3|mp4"
+            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
+            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
+            + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
+            + r"|epub|dll|cnf|tgz|sha1"
+            + r"|thmx|mso|arff|rtf|jar|csv"
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|xml|json)$", parsed.path.lower()):
+            return False
+        else:
+            return can_parse(url)
 
-    except TypeError:
+    except TypeError or URLError:
         print ("TypeError for ", parsed)
-        raise
