@@ -146,7 +146,6 @@ def extract_next_links(url, resp, counter_object):
             if too_similar(soup, counter_object): # Check if the page is too similar to another page before reading it
                 return links
 
-
             save_page_data(resp.url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
 
             for tag in soup.find_all():
