@@ -75,5 +75,7 @@ def similarity_score(url1, url2) -> float:
     max_path_length = max(len(url1.path), len(url2.path))
     max_query_length = max(len(url1.query), len(url2.query))
     max_distance = max(max_path_length, max_query_length)
+    if max_distance == 0:
+        return 1
 
     return 1 - ((path_score + query_score) / 2) / max_distance
