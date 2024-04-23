@@ -5,7 +5,7 @@ class CounterObject:
         self.ics_subdomains = {}
         self.word_count = {}
         self.longest_page = (None, 0)
-        self.documents = [] # list of bit represented documents
+        self.documents = set() # set of bit represented documents
         self.stopwords = [
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
     'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
@@ -30,6 +30,7 @@ class CounterObject:
 
 
     def add_new_page(self, url, word_list):
+        """Adds a new page to the counter object and writes the data to a file."""
         self.all_page_data[url] = word_list
         with open("data.txt", "a+") as f:
             f.write(f"{url}: {word_list}\n\n\n\n")
@@ -97,6 +98,7 @@ class CounterObject:
         return self.longest_page[0]
 
     def get_all_words(self, content):
+        """Returns a dictionary of all the words in the content and their frequency."""
         word_dict = {}
         for word in content:
             if word not in self.stopwords:
@@ -106,22 +108,37 @@ class CounterObject:
                     word_dict[word] = 1
         return word_dict
 
-    def compare_bits(self, bits, bit_str):
+    def compare_bits(self, bits: list, bit_str: str) -> bool:
+        """
+        Compares the content of the current document to the content of the other documents via bits
+        :param bits: list of bits for easy comparison
+        :param bit_str: string of bits for easy document storage
+        :return: bool if the document is similar to another document
+        """
         if len(self.documents) == 0:
-            self.documents.append(int(bit_str))
+            # inital case and add
+            self.documents.add(bit_str)
             return False
         else:
             for other_bits in self.documents:
+                # comparing to other documents
+                other_bits = int(other_bits, 2)
                 count = 0
                 for i in range(16):
-                    bit_num1 = (bits[i] >> i) & 1
-                    bit_num2 = (other_bits >> i) & 1
+                    # comparing each bit
+                    bit_num1 = bits[i]
+                    bit_num2 = (other_bits & (1 << i)) >> i
                     if bit_num1 == 1 and bit_num2 == 1:
+                        # if similar increment count
                         count += 1
-                if (count / 16) >= 0.8:
-                    return False
-            self.documents.append(int(bit_str))
-            return True
+                similarity_ratio = count / 16
+                print("SIMILARITY = ", similarity_ratio)
+                # if the similarity ratio is greater than 0.8, return true
+                if similarity_ratio >= 0.8:
+                    return True
+            self.documents.add(bit_str)
+            print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
+            return False
 
 
     def get_50_most_common_words(self):
