@@ -63,7 +63,7 @@ def too_similar(soup, counter_object) -> bool:
     # takes out the script and style tags
     for script in soup(["script", "style"]):
         script.decompose()
-    content = [text.split() for text in soup.stripped_strings]
+    content = [text.lower().split() for text in soup.stripped_strings]
     content = [word for sublist in content for word in sublist]
     # get rid of all punctuation
     content = [re.sub(r'[^\w\s]', '', word) for word in content]
@@ -75,7 +75,7 @@ def too_similar(soup, counter_object) -> bool:
 
     summed_hashes = []
     # now count the hashes and form the vectors
-    for i in range(7, -1, -1):
+    for i in range(15, -1, -1):
         # from every bit of every word
         the_hash = 0
         bitmask = 1 << i
@@ -133,7 +133,7 @@ def extract_next_links(url, resp, counter_object) -> list:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
                     # check if valid link and if similar to any link
-                    similar = True if any(similarity_score(link, prev_link) > 0.8 for prev_link in links) else False
+                    similar = True if any(similarity_score(link, prev_link) >= 0.8 for prev_link in links) else False
                     if is_valid(link) and not similar:
                         links.add(link)
                         print(f'Linked added successfully! {link}')

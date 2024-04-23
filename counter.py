@@ -130,7 +130,7 @@ class CounterObject:
                     if bit1 == bit2:
                         # If bits are equivalent, increment count
                         count += 1
-                similarity_ratio = count / 8
+                similarity_ratio = count / 16
                 print("SIMILARITY = ", similarity_ratio)
                 # If the similarity ratio is greater than or equal to 0.8, return True
                 if similarity_ratio >= 0.8:
