@@ -99,13 +99,16 @@ def too_similar(soup, counter_object) -> bool:
         summed_hashes.append(the_hash)
 
     bit_rep = []
+    bit_str = ""
     for nums in summed_hashes:
         if nums > 0:
+            bit_str += "1"
             bit_rep.append(1)
         else:
+            bit_str += "0"
             bit_rep.append(0)
 
-    return counter_object.compare_bits(bit_rep)
+    return counter_object.compare_bits(bit_rep, bit_str)
 
 def scraper(url, resp, counter_object):
     print(f'\n\nTIME TO SCRAPE!!\n\n')

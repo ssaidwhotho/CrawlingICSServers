@@ -106,21 +106,21 @@ class CounterObject:
                     word_dict[word] = 1
         return word_dict
 
-    def compare_bits(self, bits):
+    def compare_bits(self, bits, bit_str):
         if len(self.documents) == 0:
-            self.documents.append(bits)
+            self.documents.append(int(bit_str))
             return False
         else:
             for other_bits in self.documents:
                 count = 0
                 for i in range(16):
-                    bit_num1 = (bits >> i) & 1
+                    bit_num1 = (bits[i] >> i) & 1
                     bit_num2 = (other_bits >> i) & 1
                     if bit_num1 == 1 and bit_num2 == 1:
                         count += 1
                 if (count / 16) >= 0.8:
                     return False
-            self.documents.append(bits)
+            self.documents.append(int(bit_str))
             return True
 
 
