@@ -5,7 +5,7 @@ import random
 from threading import Thread, RLock
 from queue import Queue, Empty
 
-from utils import get_logger, get_urlhash, normalize
+from utils import get_logger, get_urlhash, normalize, similarity_score
 from scraper import is_valid
 
 
@@ -60,6 +60,12 @@ class Frontier(object):
 
     def add_url(self, url):
         url = normalize(url)
+        # check similarity of url to previously visited urls via levenstein distance
+        for prev_url in self.to_be_downloaded:
+            similarity = similarity_score(url, prev_url)
+            if similarity > 0.8:
+                print(f"\n\n URL SIMILARITY DETECTED {url} \n\n") # delete soon
+                return
         urlhash = get_urlhash(url)
         if urlhash not in self.save and urlhash not in self.previously_visited:  # don't put in if seen before
             self.save[urlhash] = (url, False)
