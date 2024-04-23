@@ -88,15 +88,15 @@ def too_similar(soup, counter_object) -> bool:
     # now count the hashes and form the vectors
     for i in range(16, -1, -1):
         # from every bit of every word
-        hash = 0
+        the_hash = 0
         bitmask = 1 << i
         for word, hash_value in hash_dict.items():
             bit_value = (hash_value & bitmask) >> i
             if bit_value == 0:
-                hash -= word_dict[word]
+                the_hash -= word_dict[word]
             else:
-                hash += word_dict[word]
-        summed_hashes.append(hash)
+                the_hash += word_dict[word]
+        summed_hashes.append(the_hash)
 
     bit_rep = []
     for nums in summed_hashes:
