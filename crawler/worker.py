@@ -35,8 +35,10 @@ class Worker(Thread):
 
     def run(self):
         while True:
+            # attempt to ping the server to make sure it's not down
             server_status = check_ping()
             while server_status == "Network Error":
+                print("Network Error, waiting 60 seconds to try again.")
                 time.sleep(60)
                 server_status = check_ping()
             tbd_url = self.frontier.get_tbd_url()
