@@ -1,9 +1,11 @@
 class CounterObject:
     def __init__(self):
+        self.all_page_data = {}
         self.unique_pages = 0
         self.ics_subdomains = {}
         self.word_count = {}
         self.longest_page = (None, 0)
+        self.documents = [] # list of bit represented documents
         self.stopwords = [
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
     'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
@@ -25,6 +27,19 @@ class CounterObject:
     "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
     "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
     "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
+
+
+    def add_new_page(self, url, word_list):
+        self.all_page_data[url] = word_list
+        with open("data.txt", "a+") as f:
+            f.write(f"{url}: {word_list}\n\n\n\n")
+
+        with open("allInfo.txt", "w+") as f1:
+            f1.write(f"Unique Pages: {self.unique_pages}\n\n")
+            f1.write(f"Longest Page: {self.longest_page}\n\n")
+            f1.write(f"50 Most Common Words: {self.get_50_most_common_words()}\n\n")
+            f1.write(f"ICS Subdomains: {self.ics_subdomains}\n\n")
+            f1.write(f"Word Count: {self.word_count}\n\n")
 
 
     def increment_unique_pages(self):
@@ -57,6 +72,12 @@ class CounterObject:
     def set_longest_page(self, url, word_count):
         self.longest_page = (url, word_count)
 
+    def get_prev_urls(self):
+        return self.all_page_data.keys()
+
+    def get_prev_url_data(self, url):
+        return self.all_page_data[url]
+
     def get_unique_pages(self):
         return self.unique_pages
 
@@ -74,6 +95,31 @@ class CounterObject:
 
     def get_longest_page_url(self):
         return self.longest_page[0]
+
+    def get_all_words(self, content):
+        word_dict = {}
+        for word in content:
+            if word not in self.stopwords:
+                word_dict[word] += 1 if word in word_dict else 1
+        return word_dict
+
+    def compare_bits(self, bits):
+        if len(self.documents) == 0:
+            self.documents.append(bits)
+            return False
+        else:
+            for other_bits in self.documents:
+                count = 0
+                for i in range(16):
+                    bit_num1 = (bits >> i) & 1
+                    bit_num2 = (other_bits >> i) & 1
+                    if bit_num1 == 1 and bit_num2 == 1:
+                        count += 1
+                if (count / 16) >= 0.8:
+                    return False
+            self.documents.append(bits)
+            return True
+
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word
