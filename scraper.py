@@ -9,7 +9,8 @@ from ssl import SSLCertVerificationError
 TEN_MB = 10 * 1024 * 1024
 
 
-def save_page_data(url, soup, counter_object):
+def save_page_data(url, soup, counter_object) -> None:
+    # Save data for server statistics
     text = soup.get_text()
     words = re.findall(r"\b[\w’.\']+\b", text.lower())
     word_count = len(words)  # Increment the word count
@@ -21,7 +22,7 @@ def save_page_data(url, soup, counter_object):
         counter_object.set_longest_page(url, word_count)
 
 
-def count_if_ics_subdomain(url, counter_object):
+def count_if_ics_subdomain(url, counter_object) -> None:
     # Count the number of pages that are in the ics subdomain
     parsed = urlparse(url)
     if parsed.netloc.endswith(".ics.uci.edu"):
@@ -59,6 +60,9 @@ def too_similar(soup, counter_object) -> bool:
     :param counter_object: Counter object
     :return: bool if page is too similar or not
     """
+    # takes out the script and style tags
+    for script in soup(["script", "style"]):
+        script.decompose()
     content = soup.get_text()
     content = re.findall(r"\b[\w’.\']+\b", content.lower())
     word_dict = counter_object.get_all_words(content)
@@ -107,17 +111,17 @@ def extract_next_links(url, resp, counter_object) -> list:
 
             if too_similar(soup, counter_object):  # Check if the page is too similar to another page before reading it
                 print("\n\nit's too similar tbh\n\nß")
-                return links
+                return []
 
             if len(resp.content) > TEN_MB: # Check if the page is too big
                 print("\n\nit's too big tbh\n\nß")
-                return links
+                return []
 
             text_elements = soup.find_all('p') # not high textual content
             total_text_length = sum(len(element.text) for element in text_elements)
             if total_text_length < 1000:
                 print("\n\nit's too small tbh\n\nß")
-                return links
+                return []
 
             save_page_data(resp.url, soup,
                            counter_object)  # Count the words in the page, also checks if it's the longest page
