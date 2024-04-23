@@ -113,7 +113,7 @@ def extract_next_links(url, resp, counter_object) -> list:
                 print("\n\nit's too similar tbh\n\nß")
                 return []
 
-            if len(resp.content) > TEN_MB: # Check if the page is too big
+            if len(resp.raw_response.content) > TEN_MB: # Check if the page is too big
                 print("\n\nit's too big tbh\n\nß")
                 return []
 
