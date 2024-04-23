@@ -1,3 +1,4 @@
+from utils.hasher import Hash
 class CounterObject:
     def __init__(self):
         self.all_page_data = {}
@@ -5,6 +6,7 @@ class CounterObject:
         self.ics_subdomains = {}
         self.word_count = {}
         self.longest_page = (None, 0)
+        self._hasher = Hash()
         self.documents = set() # set of bit represented documents
         self.stopwords = [
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
@@ -94,6 +96,9 @@ class CounterObject:
     def get_longest_page_count(self):
         return self.longest_page[1]
 
+    def hasher(self, word):
+        return self._hasher.get_hash(word)
+
     def get_longest_page_url(self):
         return self.longest_page[0]
 
@@ -108,32 +113,26 @@ class CounterObject:
                     word_dict[word] = 1
         return word_dict
 
-    def compare_bits(self, bits: list, bit_str: str) -> bool:
+    def compare_bits(self, bit_str: str) -> bool:
         """
         Compares the content of the current document to the content of the other documents via bits
-        :param bits: list of bits for easy comparison
         :param bit_str: string of bits for easy document storage
         :return: bool if the document is similar to another document
         """
         if len(self.documents) == 0:
-            # inital case and add
+            # inital case and add reversed bits
             self.documents.add(bit_str)
             return False
         else:
-            for other_bits in self.documents:
-                # comparing to other documents
-                other_bits = int(other_bits, 2)
+            for other_bit_str in self.documents:
                 count = 0
-                for i in range(16):
-                    # comparing each bit
-                    bit_num1 = bits[i]
-                    bit_num2 = (other_bits & (1 << i)) >> i
-                    if bit_num1 == 1 and bit_num2 == 1:
-                        # if similar increment count
+                for bit1, bit2 in zip(bit_str, other_bit_str):
+                    if bit1 == bit2:
+                        # If bits are equivalent, increment count
                         count += 1
-                similarity_ratio = count / 16
+                similarity_ratio = count / 8
                 print("SIMILARITY = ", similarity_ratio)
-                # if the similarity ratio is greater than 0.8, return true
+                # If the similarity ratio is greater than or equal to 0.8, return True
                 if similarity_ratio >= 0.8:
                     return True
             self.documents.add(bit_str)

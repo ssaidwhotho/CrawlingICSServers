@@ -63,18 +63,19 @@ def too_similar(soup, counter_object) -> bool:
     # takes out the script and style tags
     for script in soup(["script", "style"]):
         script.decompose()
-    content = soup.get_text()
-    content = re.findall(r"\b[\w’.\']+\b", content.lower())
+    content = [text.split() for text in soup.stripped_strings]
+    content = [word for sublist in content for word in sublist]
+    # get rid of all punctuation
+    content = [re.sub(r'[^\w\s]', '', word) for word in content]
     word_dict = counter_object.get_all_words(content)
     # hash all words
     hash_dict = {}
     for words in word_dict.keys():
-        hashed = hash(words) & 0xFFFF # bit manipulation to get 16 bits
-        hash_dict[words] = hashed
+        hash_dict[words] = counter_object.hasher(words)
 
     summed_hashes = []
     # now count the hashes and form the vectors
-    for i in range(15, -1, -1):
+    for i in range(7, -1, -1):
         # from every bit of every word
         the_hash = 0
         bitmask = 1 << i
@@ -89,7 +90,7 @@ def too_similar(soup, counter_object) -> bool:
     bit_rep = [1 if nums > 0 else 0 for nums in summed_hashes]
     bit_str = ''.join(str(bit) for bit in bit_rep)
 
-    return counter_object.compare_bits(bit_rep, bit_str)
+    return counter_object.compare_bits(bit_str)
 
 
 def scraper(url, resp, counter_object) -> list:
