@@ -18,22 +18,8 @@ def main(config_file, restart):
 
 
 if __name__ == "__main__":
-    ############################################## DELETE
-    start_time = time.time()
-    max_time = 10  # Set timeout to 10 seconds
-    while time.time() - start_time < max_time:
-        parser = ArgumentParser()
-        parser.add_argument("--restart", action = "store_true", default = False)
-        parser.add_argument("--config_file", type = str, default = "config.ini")
-        args = parser.parse_args()
-        main(args.config_file, args.restart)
-        pass
-    print("The code stopped running after 30 seconds.")
-    ############################################## DELETE
-
-    # parser = ArgumentParser()
-    # parser.add_argument("--restart", action="store_true", default=False)
-    # parser.add_argument("--config_file", type=str, default="config.ini")
-    # args = parser.parse_args()
-    # main(args.config_file, args.restart)
-
+    parser = ArgumentParser()
+    parser.add_argument("--restart", action="store_true", default=False)
+    parser.add_argument("--config_file", type=str, default="config.ini")
+    args = parser.parse_args()
+    main(args.config_file, args.restart)

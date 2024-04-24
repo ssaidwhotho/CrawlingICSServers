@@ -1,3 +1,4 @@
+from utils.hasher import Hash
 class CounterObject:
     def __init__(self):
         self.all_page_data = {}
@@ -5,6 +6,8 @@ class CounterObject:
         self.ics_subdomains = {}
         self.word_count = {}
         self.longest_page = (None, 0)
+        self._hasher = Hash()
+        self.documents = {} # dict of bit represented documents
         self.stopwords = [
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
     'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
@@ -29,6 +32,7 @@ class CounterObject:
 
 
     def add_new_page(self, url, word_list):
+        """Adds a new page to the counter object and writes the data to a file."""
         self.all_page_data[url] = word_list
         with open("data.txt", "a+") as f:
             f.write(f"{url}: {word_list}\n\n\n\n")
@@ -92,8 +96,51 @@ class CounterObject:
     def get_longest_page_count(self):
         return self.longest_page[1]
 
+    def hasher(self, word):
+        return self._hasher.get_hash(word)
+
     def get_longest_page_url(self):
         return self.longest_page[0]
+
+    def get_all_words(self, content):
+        """Returns a dictionary of all the words in the content and their frequency."""
+        word_dict = {}
+        for word in content:
+            if word not in self.stopwords:
+                if word in word_dict:
+                    word_dict[word] += 1
+                else:
+                    word_dict[word] = 1
+        return word_dict
+
+    def compare_bits(self, bit_str: str, url) -> bool:
+        """
+        Compares the content of the current document to the content of the other documents via bits
+        :param bit_str: string of bits for easy document storage
+        :return: bool if the document is similar to another document
+        """
+        if len(self.documents) == 0:
+            # inital case and add reversed bits
+            self.documents[bit_str] = url
+            return False
+        else:
+            for other_bit_str in self.documents.keys():
+                count = 0
+                print(f"comparing {bit_str} to {other_bit_str}")
+                for bit1, bit2 in zip(bit_str, other_bit_str):
+                    if bit1 == bit2:
+                        # If bits are equivalent, increment count
+                        count += 1
+                similarity_ratio = count / 64
+                print("SIMILARITY = ", similarity_ratio)
+                # If the similarity ratio is greater than or equal to 0.9, return True
+                if similarity_ratio >= 0.9:
+                    print("\n\nSimilar to ", self.documents[other_bit_str])
+                    return True
+            self.documents[bit_str] = url
+            print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
+            return False
+
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word

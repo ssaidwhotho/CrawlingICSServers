@@ -1,5 +1,6 @@
 import re
-from urllib.parse import urlparse, urlunparse, urljoin, urldefrag
+from utils import similarity_score
+from urllib.parse import urlparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
 from urllib.error import URLError
 from bs4 import BeautifulSoup, SoupStrainer
@@ -47,8 +48,8 @@ def count_page_words(url, soup, counter_object):
     # Count the words in the page
     # TODO: check if this saves correctly and save locally
     text = soup.get_text()
-    words = re.findall(r"\b[\w\’\.\']+\b", text.lower())
-    word_count = len(words) # Increment the word count
+    words = re.findall(r"\b[\w’.\']+\b", text.lower())
+    word_count = len(words)  # Increment the word count
     counter_object.add_new_page(url, words)
     counter_object.increment_words(words)
 
@@ -57,9 +58,8 @@ def count_page_words(url, soup, counter_object):
         counter_object.set_longest_page(url, word_count)
 
 
-def count_if_ics_subdomain(url, counter_object):
+def count_if_ics_subdomain(url, counter_object) -> None:
     # Count the number of pages that are in the ics subdomain
-    # TODO: check if this saves correctly and save locally
     parsed = urlparse(url)
     if parsed.netloc.endswith(".ics.uci.edu"):
         counter_object.increment_ics_subdomains(parsed.netloc)
@@ -78,7 +78,7 @@ def can_parse(url) -> bool:
         robot_parse = RobotParser()
         parsed_url = urlparse(url)
         print(parsed_url)
-        if (not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs)):
+        if not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs):
             return False
         robots_url = parsed_url.scheme + "://" + parsed_url.netloc + "/robots.txt"
         robot_parse.set_url(robots_url)
@@ -88,20 +88,46 @@ def can_parse(url) -> bool:
         print("\n\ni errored\n\n")
         return False
 
-def too_similar(url, soup, counter_object):
-    text = soup.get_text()
-    words = re.findall(r'\w+', text.lower())
 
-    for prev_url in counter_object.get_prev_urls():
-        prev_words = counter_object.get_prev_url_data(prev_url)
-        if SequenceMatcher(None, words, prev_words).ratio() >= 0.85:
-            print(f'THE SIMILARITY BETWEEN THESE TWO IS >= 80%: {url} -> {prev_url}')
-            return True
+def too_similar(url, soup, counter_object) -> bool:
+    """
+    Checks if the page is too similar to another page before reading it by SimHashing content
+    :param soup: BeautifulSoup object
+    :param counter_object: Counter object
+    :return: bool if page is too similar or not
+    """
+    # takes out the script and style tags
+    for script in soup(["script", "style"]):
+        script.decompose()
+    text = ' '.join(soup.stripped_strings)
+    words = re.findall(r"\b[\w’.\']+\b", text.lower())
+    word_dict = counter_object.get_all_words(words)
+    # hash all words
+    hash_dict = {}
+    for word in word_dict.keys():
+        hash_dict[word] = counter_object.hasher(word)
 
-    return False
+    summed_hashes = []
+    # now count the hashes and form the vectors
+    for i in range(63, -1, -1):
+        # from every bit of every word
+        the_hash = 0
+        bitmask = 1 << i
+        for word, hash_value in hash_dict.items():
+            bit_value = (hash_value & bitmask) >> i
+            if bit_value == 0:
+                the_hash -= word_dict[word]  # if the bit is 0, subtract the word count
+            else:
+                the_hash += word_dict[word]  # if the bit is 1, add the word count
+        summed_hashes.append(the_hash)
+
+    bit_rep = [1 if nums > 0 else 0 for nums in summed_hashes]
+    bit_str = ''.join(str(bit) for bit in bit_rep)
+
+    return counter_object.compare_bits(bit_str, url)
 
 
-def scraper(url, resp, counter_object):
+def scraper(url, resp, counter_object) -> list:
     print(f'\n\nTIME TO SCRAPE!!\n\n')
     links = extract_next_links(url, resp, counter_object)
     if not links:
@@ -115,39 +141,36 @@ def scraper(url, resp, counter_object):
     # TODO: check if this saves correctly and save locally
     counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
-    # TODO MAYBE: Save the URL and webpage on the local disk
     return links
 
 
-def extract_next_links(url, resp, counter_object):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+def extract_next_links(url, resp, counter_object) -> list:
     links = set()
-    """ TODO: if the website is taking forever to load, we should just leave it
-    -   thinking of just setting a timer and if it overlaps"""
-    if resp.error is None: # Hard coding case where the url status is OK
+    if resp.error is None:  # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
+            if too_similar(url, soup, counter_object):  # Check if the page is too similar to another page before reading it
+                print("\n\nit's too similar tbh\n\nß")
+                return []
 
-            if too_similar(url, soup, counter_object): # Check if the page is too similar to another page before reading it
-                return links
+            if len(resp.raw_response.content) > TEN_MB:  # Check if the page is too big
+                print("\n\nit's too big tbh\n\nß")
+                return []
 
+            # TODO: find what's not enough textual information?
 
-            save_page_data(resp.url, soup, counter_object) # Count the words in the page, also checks if it's the longest page
+            save_page_data(resp.url, soup,
+                           counter_object)  # Count the words in the page, also checks if it's the longest page
 
+            # Extract the links from the page
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
-                    if is_valid(link): # checking for similarities
+                    # check if valid link and if similar to any link
+                    similar = True if any(similarity_score(link, prev_link) >= 0.9 for prev_link in links) else False
+                    if is_valid(link) and not similar:
                         links.add(link)
                         print(f'Linked added successfully! {link}')
                     else:
@@ -160,7 +183,7 @@ def extract_next_links(url, resp, counter_object):
     return list(links)
 
 
-def is_valid(url):
+def is_valid(url) -> bool:
     # Decide whether to crawl this url or not.
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
@@ -170,25 +193,24 @@ def is_valid(url):
             return False
         if 'embed' in parsed.path.lower():  # Check if 'embed?url' is present in the query string
             return False
-        if 'wp-json' in parsed.path.lower(): # check for json websites
+        if 'wp-json' in parsed.path.lower():  # check for json websites
             return False
-        if '\\' in parsed.path.lower(): # check for weird escape symbol urls
+        if '\\' in parsed.path.lower():  # check for weird escape symbol urls
             return False
-        if "php" in parsed.path.lower(): # php checking but re.match might already do this
+        if "php" in parsed.path.lower():  # php checking but re.match might already do this
             return False
-            # louie deleted cus I already check it in can_parse
         if re.match(
-            r".*\.(css|js|bmp|gif|jpe?g|ico"
-            + r"|png|tiff?|mid|mp2|mp3|mp4"
-            + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
-            + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
-            + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
-            + r"|epub|dll|cnf|tgz|sha1"
-            + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|xml|json)$", parsed.path.lower()):
+                r".*\.(css|js|bmp|gif|jpe?g|ico"
+                + r"|png|tiff?|mid|mp2|mp3|mp4"
+                + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
+                + r"|ps|eps|tex|ppt|pptx|doc|docx|xls|xlsx|names"
+                + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
+                + r"|epub|dll|cnf|tgz|sha1"
+                + r"|thmx|mso|arff|rtf|jar|csv"
+                + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|json)$", parsed.path.lower()):
             return False
         else:
             return can_parse(url)
 
     except TypeError or URLError:
-        print ("TypeError for ", parsed)
+        print("TypeError for ", parsed)
