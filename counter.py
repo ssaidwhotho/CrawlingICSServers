@@ -7,7 +7,7 @@ class CounterObject:
         self.word_count = {}
         self.longest_page = (None, 0)
         self._hasher = Hash()
-        self.documents = set() # set of bit represented documents
+        self.documents = {} # dict of bit represented documents
         self.stopwords = [
     'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
     'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
@@ -113,7 +113,7 @@ class CounterObject:
                     word_dict[word] = 1
         return word_dict
 
-    def compare_bits(self, bit_str: str) -> bool:
+    def compare_bits(self, bit_str: str, url) -> bool:
         """
         Compares the content of the current document to the content of the other documents via bits
         :param bit_str: string of bits for easy document storage
@@ -121,21 +121,23 @@ class CounterObject:
         """
         if len(self.documents) == 0:
             # inital case and add reversed bits
-            self.documents.add(bit_str)
+            self.documents[bit_str] = url
             return False
         else:
-            for other_bit_str in self.documents:
+            for other_bit_str in self.documents.keys():
                 count = 0
+                print(f"comparing {bit_str} to {other_bit_str}")
                 for bit1, bit2 in zip(bit_str, other_bit_str):
                     if bit1 == bit2:
                         # If bits are equivalent, increment count
                         count += 1
-                similarity_ratio = count / 16
+                similarity_ratio = count / 64
                 print("SIMILARITY = ", similarity_ratio)
-                # If the similarity ratio is greater than or equal to 0.8, return True
+                # If the similarity ratio is greater than or equal to 0.9, return True
                 if similarity_ratio >= 0.9:
+                    print("\n\nSimilar to ", self.documents[other_bit_str])
                     return True
-            self.documents.add(bit_str)
+            self.documents[bit_str] = url
             print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
             return False
 

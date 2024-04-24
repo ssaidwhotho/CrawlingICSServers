@@ -7,7 +7,7 @@ class Hash:
         if word in self.hash_dict:
             return self.hash_dict[word]
         else:
-            self.hash_dict[word] = hash(word) & 0xFFFF
+            self.hash_dict[word] = hash(word) & 0xFFFFFFFFFFFFFFFF # 64 bits
             return self.hash_dict[word]
 
     def get_all_hashes(self):

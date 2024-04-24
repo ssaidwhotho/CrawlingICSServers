@@ -53,7 +53,7 @@ def can_parse(url) -> bool:
         return False
 
 
-def too_similar(soup, counter_object) -> bool:
+def too_similar(url, soup, counter_object) -> bool:
     """
     Checks if the page is too similar to another page before reading it by SimHashing content
     :param soup: BeautifulSoup object
@@ -63,34 +63,32 @@ def too_similar(soup, counter_object) -> bool:
     # takes out the script and style tags
     for script in soup(["script", "style"]):
         script.decompose()
-    content = [text.lower().split() for text in soup.stripped_strings]
-    content = [word.lower() for sublist in content for word in sublist]
-    # get rid of all punctuation
-    content = [re.sub(r'[^\w\s]', '', word) for word in content]
-    word_dict = counter_object.get_all_words(content)
+    text = ' '.join(soup.stripped_strings)
+    words = re.findall(r"\b[\w’.\']+\b", text.lower())
+    word_dict = counter_object.get_all_words(words)
     # hash all words
     hash_dict = {}
-    for words in word_dict.keys():
-        hash_dict[words] = counter_object.hasher(words)
+    for word in word_dict.keys():
+        hash_dict[word] = counter_object.hasher(word)
 
     summed_hashes = []
     # now count the hashes and form the vectors
-    for i in range(15, -1, -1):
+    for i in range(63, -1, -1):
         # from every bit of every word
         the_hash = 0
         bitmask = 1 << i
         for word, hash_value in hash_dict.items():
             bit_value = (hash_value & bitmask) >> i
             if bit_value == 0:
-                the_hash -= word_dict[word] # if the bit is 0, subtract the word count
+                the_hash -= word_dict[word]  # if the bit is 0, subtract the word count
             else:
-                the_hash += word_dict[word] # if the bit is 1, add the word count
+                the_hash += word_dict[word]  # if the bit is 1, add the word count
         summed_hashes.append(the_hash)
 
     bit_rep = [1 if nums > 0 else 0 for nums in summed_hashes]
     bit_str = ''.join(str(bit) for bit in bit_rep)
 
-    return counter_object.compare_bits(bit_str)
+    return counter_object.compare_bits(bit_str, url)
 
 
 def scraper(url, resp, counter_object) -> list:
@@ -110,11 +108,11 @@ def extract_next_links(url, resp, counter_object) -> list:
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
-            if too_similar(soup, counter_object):  # Check if the page is too similar to another page before reading it
+            if too_similar(url, soup, counter_object):  # Check if the page is too similar to another page before reading it
                 print("\n\nit's too similar tbh\n\nß")
                 return []
 
-            if len(resp.raw_response.content) > TEN_MB: # Check if the page is too big
+            if len(resp.raw_response.content) > TEN_MB:  # Check if the page is too big
                 print("\n\nit's too big tbh\n\nß")
                 return []
 
