@@ -9,44 +9,8 @@ from ssl import SSLCertVerificationError
 TEN_MB = 10 * 1024 * 1024
 WORD_REGEX = re.compile(r'\b[a-zA-Z\'.]+\b')
 
-def bad_size(url): # TODO: Haven't implemented yet, but want to put it in can_parse() once we move that func
-    # Returns True if the file is too big or empty, else False
-    MAX_FILE_SIZE = 10 * 1024 * 1024 # == 10mb
-    # TODO: Get content length of the page in mb
-    # TODO: Find a way to check if the information is of low or high value
-    content_length = len(url) # Placeholder for now
-    if content_length > MAX_FILE_SIZE:
-        return True
-
-    # TODO: Check if the file is empty
-    if content_length == 0 or len(url.title) == 0: # Placeholder for now
-        return True
-    return False
-
-
-def similarity_score(a, b): # A similarity checker I found online that might work
-    from difflib import SequenceMatcher
-    return SequenceMatcher(None, a, b).ratio()
-
-
-def too_similar(soup, visited_contents): # Return True if the page is too similar to any prev. page
-    # TODO: Find a way to feed this function all the previously visited page contents.
-
-    if any(similarity_score(soup, visited_content) > 0.9 for visited_content in visited_contents): # 0.9 is 90% similar
-        return True
-    return False
-
-
-def check_redirects(url):
-    response = requests.get(url, allow_redirects = True)
-    if url != response.url:
-        return response.url
-    return None
-
-
-def count_page_words(url, soup, counter_object):
-    # Count the words in the page
-    # TODO: check if this saves correctly and save locally
+def save_page_data(url, soup, counter_object) -> None:
+    # Save data for server statistics
     text = soup.get_text()
     words = WORD_REGEX.findall(text.lower())
     word_count = len(words)  # Increment the word count
@@ -129,14 +93,8 @@ def scraper(url, resp, counter_object) -> list:
     links = extract_next_links(url, resp, counter_object)
     if not links:
         return []
-    links = list(set(urldefrag(link).url for link in links)) # defraged url!
-
-    redirect_link = check_redirects(url) # Check if there was a redirect, if so append to links
-    if redirect_link is not None:
-        links.append(redirect_link)
-
-    # TODO: check if this saves correctly and save locally
-    counter_object.increment_unique_pages() # Word counting is done within extract_next_links()
+    links = list(set(urldefrag(link).url for link in links))  # defraged url!
+    counter_object.increment_unique_pages()  # Word counting is done within extract_next_links()
     count_if_ics_subdomain(url, counter_object)
     return links
 
