@@ -134,7 +134,7 @@ class CounterObject:
                 similarity_ratio = count / 64
                 print("SIMILARITY = ", similarity_ratio)
                 # If the similarity ratio is greater than or equal to 0.9, return True
-                if similarity_ratio >= 0.9:
+                if similarity_ratio >= 0.86:
                     print("\n\nSimilar to ", self.documents[other_bit_str])
                     return True
             self.documents[bit_str] = url
