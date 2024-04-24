@@ -7,12 +7,12 @@ from bs4 import BeautifulSoup
 from ssl import SSLCertVerificationError
 
 TEN_MB = 10 * 1024 * 1024
-
+WORD_REGEX = re.compile(r'\b[a-zA-Z\'.]+\b')
 
 def save_page_data(url, soup, counter_object) -> None:
     # Save data for server statistics
     text = soup.get_text()
-    words = re.findall(r"\b[\w’.\']+\b", text.lower())
+    words = WORD_REGEX.findall(text.lower())
     word_count = len(words)  # Increment the word count
     counter_object.add_new_page(url, words)
     counter_object.increment_words(words)
@@ -39,16 +39,16 @@ def can_parse(url) -> bool:
     """
     allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
     try:
-        robot_parse = RobotParser()
         parsed_url = urlparse(url)
         print(parsed_url)
         if not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs):
             return False
-        robots_url = parsed_url.scheme + "://" + parsed_url.netloc + "/robots.txt"
+        robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
+        robot_parse = RobotParser()
         robot_parse.set_url(robots_url)
         robot_parse.read()
         return robot_parse.can_fetch("*", url)
-    except URLError or SSLCertVerificationError:
+    except (URLError, SSLCertVerificationError):
         print("\n\ni errored\n\n")
         return False
 
@@ -64,13 +64,10 @@ def too_similar(url, soup, counter_object) -> bool:
     for script in soup(["script", "style"]):
         script.decompose()
     text = ' '.join(soup.stripped_strings)
-    words = re.findall(r"\b[\w’.\']+\b", text.lower())
+    words = WORD_REGEX.findall(text.lower())
     word_dict = counter_object.get_all_words(words)
     # hash all words
-    hash_dict = {}
-    for word in word_dict.keys():
-        hash_dict[word] = counter_object.hasher(word)
-
+    hash_dict = {word: counter_object.hasher(word) for word in word_dict.keys()}
     summed_hashes = []
     # now count the hashes and form the vectors
     for i in range(63, -1, -1):
@@ -86,7 +83,7 @@ def too_similar(url, soup, counter_object) -> bool:
         summed_hashes.append(the_hash)
 
     bit_rep = [1 if nums > 0 else 0 for nums in summed_hashes]
-    bit_str = ''.join(str(bit) for bit in bit_rep)
+    bit_str = ''.join(map(str, bit_rep))
 
     return counter_object.compare_bits(bit_str, url)
 
@@ -131,8 +128,6 @@ def extract_next_links(url, resp, counter_object) -> list:
                     if is_valid(link) and not similar:
                         links.add(link)
                         print(f'Linked added successfully! {link}')
-                    else:
-                        print(f'\n\nLink not valid {link}\n\n')
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
