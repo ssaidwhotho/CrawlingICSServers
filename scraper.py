@@ -127,7 +127,7 @@ def extract_next_links(url, resp, counter_object) -> list:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
                     # check if valid link and if similar to any link
-                    similar = True if any(similarity_score(link, prev_link) >= 0.86 for prev_link in links) else False
+                    similar = True if any(similarity_score(link, prev_link) >= 0.9 for prev_link in links) else False
                     if is_valid(link) and not similar:
                         links.add(link)
                         print(f'Linked added successfully! {link}')
