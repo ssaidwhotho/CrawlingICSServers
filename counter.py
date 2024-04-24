@@ -1,4 +1,6 @@
 from utils.hasher import Hash
+
+
 class CounterObject:
     def __init__(self):
         self.all_page_data = {}
@@ -7,29 +9,28 @@ class CounterObject:
         self.word_count = {}
         self.longest_page = (None, 0)
         self._hasher = Hash()
-        self.documents = {} # dict of bit represented documents
+        self.documents = {}  # dict of bit represented documents
         self.stopwords = [
-    'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
-    'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
-    'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
-    'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
-    "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
-    "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
-    "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
-    'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
-    'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
-    'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
-    'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
-    'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
-    'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
-    'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
-    'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
-    'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
-    "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
-    "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
-    "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
-    "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
-
+            'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
+            'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
+            'being', 'below', 'between', 'both', 'but', 'by', "can't", 'cannot',
+            'could', "couldn't", 'did', "didn't", 'do', 'does', "doesn't", 'doing',
+            "don't", 'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had',
+            "hadn't", 'has', "hasn't", 'have', "haven't", 'having', 'he', "he'd",
+            "he'll", "he's", 'her', 'here', "here's", 'hers', 'herself', 'him',
+            'himself', 'his', 'how', "how's", 'i', "i'd", "i'll", "i'm", "i've", 'if',
+            'in', 'into', 'is', "isn't", 'it', "it's", 'its', 'itself', "let's", 'me',
+            'more', 'most', "mustn't", 'my', 'myself', 'no', 'nor', 'not', 'of', 'off',
+            'on', 'once', 'only', 'or', 'other', "ought", 'our', 'ours', 'ourselves',
+            'out', 'over', 'own', 'same', "shan't", 'she', "she'd", "she'll", "she's",
+            'should', "shouldn't", 'so', 'some', 'such', 'than', 'that', "that's", 'the',
+            'their', 'theirs', 'them', 'themselves', 'then', 'there', "there's", 'these',
+            'they', "they'd", "they'll", "they're", "they've", 'this', 'those', 'through',
+            'to', 'too', 'under', 'until', 'up', 'very', 'was', "wasn't", 'we', "we'd",
+            "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
+            "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
+            "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
+            "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
 
     def add_new_page(self, url, word_list):
         """Adds a new page to the counter object and writes the data to a file."""
@@ -43,7 +44,6 @@ class CounterObject:
             f1.write(f"50 Most Common Words: {self.get_50_most_common_words()}\n\n")
             f1.write(f"ICS Subdomains: {self.ics_subdomains}\n\n")
             f1.write(f"Word Count: {self.word_count}\n\n")
-
 
     def increment_unique_pages(self):
         self.unique_pages += 1
@@ -88,7 +88,7 @@ class CounterObject:
         return self.ics_subdomains
 
     def get_ics_subdomain_count(self):
-        return len(self.ics_subdomains) #len(dict) returns the amount of keys, right?
+        return len(self.ics_subdomains)  # len(dict) returns the amount of keys, right?
 
     def get_word_count(self):
         return self.word_count
@@ -140,7 +140,6 @@ class CounterObject:
             self.documents[bit_str] = url
             print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
             return False
-
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word
