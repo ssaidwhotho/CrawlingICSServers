@@ -69,13 +69,14 @@ def similarity_score(url1, url2) -> float:
     if url1.netloc != url2.netloc:
         return 0
 
-    path_score = levenstein_distance(url1.path, url2.path)
-    query_score = levenstein_distance(url1.query, url2.query)
-
     max_path_length = max(len(url1.path), len(url2.path))
     max_query_length = max(len(url1.query), len(url2.query))
-    max_distance = max(max_path_length, max_query_length)
-    if max_distance == 0:
+
+    if max_path_length == 0 and max_query_length == 0:
         return 1
 
-    return 1 - ((path_score + query_score) / 2) / max_distance
+    path_score = 1 - levenstein_distance(url1.path, url2.path) / max_path_length if max_path_length != 0 else 1
+    query_score = 1 - levenstein_distance(url1.query, url2.query) / max_query_length if max_query_length != 0 else 1
+
+    similarity = (path_score + query_score) / 2
+    return similarity
