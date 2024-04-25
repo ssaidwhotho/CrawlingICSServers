@@ -9,6 +9,7 @@ from ssl import SSLCertVerificationError
 TEN_MB = 10 * 1024 * 1024
 WORD_REGEX = re.compile(r'\b[a-zA-Z\'.]+\b')
 
+
 def save_page_data(url, soup, counter_object) -> None:
     # Save data for server statistics
     text = soup.get_text()
@@ -124,9 +125,12 @@ def extract_next_links(url, resp, counter_object) -> list:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
                     # check if valid link and if similar to any link
-                    similar = True if any(similarity_score(link, prev_link) >= 0.9 for prev_link in links) else False
-                    if is_valid(link) and not similar:
+                    if counter_object.was_scraped(link):
+                        print(f'Link already scraped! {link}')
+                        continue
+                    if is_valid(link) and not any(similarity_score(link, prev_link) >= 0.9 for prev_link in links):
                         links.add(link)
+                        counter_object.add_scraped_url(link)
                         print(f'Linked added successfully! {link}')
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')

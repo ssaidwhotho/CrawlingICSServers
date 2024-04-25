@@ -14,7 +14,6 @@ class Frontier(object):
         self.logger = get_logger("FRONTIER")
         self.config = config
         self.to_be_downloaded = list()
-        self.previously_visited = set()
 
         if not os.path.exists(self.config.save_file) and not restart:
             # Save file does not exist, but request to load save.
@@ -61,13 +60,8 @@ class Frontier(object):
     def add_url(self, url):
         url = normalize(url)
         # check similarity of url to previously visited urls via levenstein distance
-        for prev_url in self.to_be_downloaded:
-            similarity = similarity_score(url, prev_url)
-            if similarity >= 0.9:
-                print(f"\n\n URL SIMILARITY DETECTED {url} -> {prev_url} \n\n") # delete soon
-                return
         urlhash = get_urlhash(url)
-        if urlhash not in self.save and urlhash not in self.previously_visited:  # don't put in if seen before
+        if urlhash not in self.save and not any(similarity_score(url, prev_url) >= .9 for prev_url in self.to_be_downloaded):
             self.save[urlhash] = (url, False)
             self.save.sync()
             self.to_be_downloaded.append(url)
@@ -80,5 +74,4 @@ class Frontier(object):
                 f"Completed url {url}, but have not seen it before.")
 
         self.save[urlhash] = (url, True)
-        self.previously_visited.add(urlhash)  # adds the urlhash to mark it as visited
         self.save.sync()

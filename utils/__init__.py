@@ -66,12 +66,18 @@ def similarity_score(url1, url2) -> float:
     url1 = urlparse(url1)
     url2 = urlparse(url2)
 
+    # early exit for different domains
     if url1.netloc != url2.netloc:
         return 0
+
+    # early exit for same path and query
+    if url1.path == url2.path and url1.query == url2.query:
+        return 1
 
     max_path_length = max(len(url1.path), len(url2.path))
     max_query_length = max(len(url1.query), len(url2.query))
 
+    # early exit for empty path and query this probably shouldn't happen though
     if max_path_length == 0 and max_query_length == 0:
         return 1
 

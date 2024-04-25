@@ -1,4 +1,6 @@
 from utils.hasher import Hash
+from utils import levenstein_distance
+from urllib.parse import urlparse
 
 
 class CounterObject:
@@ -7,6 +9,7 @@ class CounterObject:
         self.unique_pages = 0
         self.ics_subdomains = {}
         self.word_count = {}
+        self.scraped_urls = set()
         self.longest_page = (None, 0)
         self._hasher = Hash()
         self.documents = {}  # dict of bit represented documents
@@ -44,6 +47,9 @@ class CounterObject:
             f1.write(f"50 Most Common Words: {self.get_50_most_common_words()}\n\n")
             f1.write(f"ICS Subdomains: {self.ics_subdomains}\n\n")
             f1.write(f"Word Count: {self.word_count}\n\n")
+
+    def add_scraped_url(self, url):
+        self.scraped_urls.add(url)
 
     def increment_unique_pages(self):
         self.unique_pages += 1
@@ -126,13 +132,11 @@ class CounterObject:
         else:
             for other_bit_str in self.documents.keys():
                 count = 0
-                print(f"comparing {bit_str} to {other_bit_str}")
                 for bit1, bit2 in zip(bit_str, other_bit_str):
                     if bit1 == bit2:
                         # If bits are equivalent, increment count
                         count += 1
                 similarity_ratio = count / 64
-                print("SIMILARITY = ", similarity_ratio)
                 # If the similarity ratio is greater than or equal to 0.9, return True
                 if similarity_ratio >= 0.9:
                     print("\n\nSimilar to ", self.documents[other_bit_str])
@@ -140,6 +144,9 @@ class CounterObject:
             self.documents[bit_str] = url
             print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
             return False
+
+    def was_scraped(self, url):
+        return url in self.scraped_urls
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word
