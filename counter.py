@@ -1,18 +1,16 @@
 from utils.hasher import Hash
-from utils import levenstein_distance
-from urllib.parse import urlparse
+import json
 
 
 class CounterObject:
     def __init__(self):
-        self.all_page_data = {}
+        self.all_page_data = set()
         self.unique_pages = 0
         self.ics_subdomains = {}
         self.word_count = {}
-        self.scraped_urls = set()
         self.longest_page = (None, 0)
         self._hasher = Hash()
-        self.documents = {}  # dict of bit represented documents
+        self.documents = list()
         self.stopwords = [
             'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and',
             'any', 'are', "aren't", 'as', 'at', 'be', 'because', 'been', 'before',
@@ -34,22 +32,41 @@ class CounterObject:
             "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
             "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
             "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
+        # try:
+        #     self.load_data()
+        # except FileNotFoundError:
+        #     # create the json
+        #     self.save_json()
 
-    def add_new_page(self, url, word_list):
+    def add_new_page(self, url):
         """Adds a new page to the counter object and writes the data to a file."""
-        self.all_page_data[url] = word_list
-        with open("data.txt", "a+") as f:
-            f.write(f"{url}: {word_list}\n\n\n\n")
+        if url not in self.all_page_data:
+            self.all_page_data.add(url)
+            self.save_json()
 
-        with open("allInfo.txt", "w+") as f1:
-            f1.write(f"Unique Pages: {self.unique_pages}\n\n")
-            f1.write(f"Longest Page: {self.longest_page}\n\n")
-            f1.write(f"50 Most Common Words: {self.get_50_most_common_words()}\n\n")
-            f1.write(f"ICS Subdomains: {self.ics_subdomains}\n\n")
-            f1.write(f"Word Count: {self.word_count}\n\n")
+    def save_json(self):
+        with open("allInfo.json", "w+") as f1:
+            json.dump({
+                'Unique Pages: ': self.unique_pages,
+                'Longest Page: ': self.longest_page,
+                '50 Most Common Words: ': self.get_50_most_common_words(),
+                'ICS Subdomains: ': self.ics_subdomains,
+                'Word Count: ': self.word_count,
+                'Hashed Dict: ': self._hasher.get_all_hashes(),
+                'Documents: ': self.documents}, f1)
 
-    def add_scraped_url(self, url):
-        self.scraped_urls.add(url)
+    # def load_data(self):
+    #     """Loads any existing data from a JSON file"""
+    #     with open("allInfo.json", 'r+') as file:
+    #         data = json.load(file)
+    #         self.word_count = data.get('Word Count: ',{})
+    #         self.unique_pages = data.get('Unique Pages: ', {})
+    #         self.ics_subdomains = data.get('ICS Subdomains: ', {})
+    #         self.documents = data.get('Documents: ', {})
+    #         self.longest_page = data.get('Longest Page: ', {})
+    #         temp_dict = data.get('Hashed Dict: ', {})
+
+    #     self._hasher.update_dict(temp_dict)
 
     def increment_unique_pages(self):
         self.unique_pages += 1
@@ -127,10 +144,10 @@ class CounterObject:
         """
         if len(self.documents) == 0:
             # inital case and add reversed bits
-            self.documents[bit_str] = url
+            self.documents.append(bit_str)
             return False
         else:
-            for other_bit_str in self.documents.keys():
+            for other_bit_str in self.documents:
                 count = 0
                 for bit1, bit2 in zip(bit_str, other_bit_str):
                     if bit1 == bit2:
@@ -139,14 +156,9 @@ class CounterObject:
                 similarity_ratio = count / 64
                 # If the similarity ratio is greater than or equal to 0.9, return True
                 if similarity_ratio >= 0.9:
-                    print("\n\nSimilar to ", self.documents[other_bit_str])
                     return True
-            self.documents[bit_str] = url
-            print(f'\n\nTHIS IS THE BITS {self.documents}\n\n')
+            self.documents.append(bit_str)
             return False
-
-    def was_scraped(self, url):
-        return url in self.scraped_urls
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word

@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, RLock
 
 from inspect import getsource
 from utils.download import download
@@ -26,6 +26,7 @@ class Worker(Thread):
         self.config = config
         self.frontier = frontier
         self.counter_object = counter_object  # make counter object a variable in the worker
+        self.lock = RLock()
         # basic check for requests in scraper
         assert {getsource(scraper).find(req) for req in {"from requests import", "import requests"}} == {
             -1}, "Do not use requests in scraper.py"
@@ -46,12 +47,29 @@ class Worker(Thread):
                 self.logger.info("Frontier is empty. Stopping Crawler.")
                 break
             resp = download(tbd_url, self.config, self.logger)
+            # lock here if multi-threading
+            with self.lock:
+                similar = scraper.too_similar(resp, self.counter_object)
+            while similar:
+                tbd_url = self.frontier.get_tbd_url()
+                if not tbd_url:
+                    self.logger.info("Frontier is empty. Stopping Crawler.")
+                    break
+                resp = download(tbd_url, self.config, self.logger)
+                with self.lock:
+                    similar = scraper.too_similar(resp, self.counter_object)
             self.logger.info(
-                f"Downloaded {tbd_url}, status <{resp.status}>, "
-                f"using cache {self.config.cache_server}.")
-            scraped_urls = scraper.scraper(tbd_url, resp,
-                                           self.counter_object)  # send the counter_object into the scraper
-            for scraped_url in scraped_urls:
-                self.frontier.add_url(scraped_url)
-            self.frontier.mark_url_complete(tbd_url)
+                    f"Downloaded {tbd_url}, status <{resp.status}>, "
+                    f"using cache {self.config.cache_server}.")
+            scraped_urls = scraper.scraper(tbd_url, resp)
+            if len(scraped_urls) > 0:
+                with self.lock:
+                    self.counter_object.increment_unique_pages()
+                    scraper.save_page_data(resp, self.counter_object)
+                # lock here if multi-threading
+                # with self.lock:
+                for scraped_url in scraped_urls:
+                    self.frontier.add_url(scraped_url)
+                self.frontier.mark_url_complete(tbd_url)
             time.sleep(self.config.time_delay)
+

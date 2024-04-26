@@ -7,26 +7,27 @@ from bs4 import BeautifulSoup
 from ssl import SSLCertVerificationError
 
 TEN_MB = 10 * 1024 * 1024
-WORD_REGEX = re.compile(r'\b[a-zA-Z\'.]+\b')
+WORD_REGEX = re.compile(r"\b[a-zA-Z\’'.]+\b")
 
 
-def save_page_data(url, soup, counter_object) -> None:
+def save_page_data(resp, counter_object) -> None:
     # Save data for server statistics
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     text = soup.get_text()
     words = WORD_REGEX.findall(text.lower())
     word_count = len(words)  # Increment the word count
-    counter_object.add_new_page(url, words)
+    counter_object.add_new_page(resp.url)
     counter_object.increment_words(words)
 
     # Check if the page is the longest page
     if word_count > counter_object.get_longest_page_count():
-        counter_object.set_longest_page(url, word_count)
+        counter_object.set_longest_page(resp.url, word_count)
 
 
-def count_if_ics_subdomain(url, counter_object) -> None:
+def count_if_ics_subdomain(resp, counter_object) -> None:
     # Count the number of pages that are in the ics subdomain
-    parsed = urlparse(url)
-    if parsed.netloc.endswith(".ics.uci.edu"):
+    parsed = urlparse(resp.url)
+    if parsed.netloc.endswith("ics.uci.edu"):
         counter_object.increment_ics_subdomains(parsed.netloc)
 
 
@@ -38,30 +39,37 @@ def can_parse(url) -> bool:
     :return: bool of whether the crawler is allowed to search the url
 
     """
-    allowed_net_locs = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
+    allowed_net_locs = ["ics.uci.edu", ".cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
     try:
         parsed_url = urlparse(url)
-        print(parsed_url)
+
         if not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs):
-            return False
+            if not parsed_url.netloc.startswith("cs.uci.edu"):  # special case for eecs, cecs, etc.
+                return False
         robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
         robot_parse = RobotParser()
         robot_parse.set_url(robots_url)
         robot_parse.read()
         return robot_parse.can_fetch("*", url)
-    except (URLError, SSLCertVerificationError):
-        print("\n\ni errored\n\n")
+    except (URLError, SSLCertVerificationError) as e:
+        print(f"\n\ni errored {e}\n\n")
         return False
 
 
-def too_similar(url, soup, counter_object) -> bool:
+def too_similar(resp, counter_object) -> bool:
     """
-    Checks if the page is too similar to another page before reading it by SimHashing content
-    :param soup: BeautifulSoup object
-    :param counter_object: Counter object
-    :return: bool if page is too similar or not
+    Checks if the page is too similar to another page
+    :param resp:
+    :param counter_object:
+    :return:
     """
     # takes out the script and style tags
+    if resp.error is not None:
+        return False
+    else:
+        if resp.status >= 300 or resp.status < 200:
+            return False
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     for script in soup(["script", "style"]):
         script.decompose()
     text = ' '.join(soup.stripped_strings)
@@ -86,29 +94,22 @@ def too_similar(url, soup, counter_object) -> bool:
     bit_rep = [1 if nums > 0 else 0 for nums in summed_hashes]
     bit_str = ''.join(map(str, bit_rep))
 
-    return counter_object.compare_bits(bit_str, url)
+    return counter_object.compare_bits(bit_str, resp)
 
 
-def scraper(url, resp, counter_object) -> list:
-    print(f'\n\nTIME TO SCRAPE!!\n\n')
-    links = extract_next_links(url, resp, counter_object)
+def scraper(url, resp) -> list:
+    links = extract_next_links(url, resp)
     if not links:
         return []
     links = list(set(urldefrag(link).url for link in links))  # defraged url!
-    counter_object.increment_unique_pages()  # Word counting is done within extract_next_links()
-    count_if_ics_subdomain(url, counter_object)
     return links
 
 
-def extract_next_links(url, resp, counter_object) -> list:
+def extract_next_links(url, resp) -> list:
     links = set()
     if resp.error is None:  # Hard coding case where the url status is OK
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-
-            if too_similar(url, soup, counter_object):  # Check if the page is too similar to another page before reading it
-                print("\n\nit's too similar tbh\n\nß")
-                return []
 
             if len(resp.raw_response.content) > TEN_MB:  # Check if the page is too big
                 print("\n\nit's too big tbh\n\nß")
@@ -116,22 +117,16 @@ def extract_next_links(url, resp, counter_object) -> list:
 
             # TODO: find what's not enough textual information?
 
-            save_page_data(resp.url, soup,
-                           counter_object)  # Count the words in the page, also checks if it's the longest page
-
             # Extract the links from the page
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
                     # check if valid link and if similar to any link
-                    if counter_object.was_scraped(link):
-                        print(f'Link already scraped! {link}')
+                    if link in links:
                         continue
                     if is_valid(link) and not any(similarity_score(link, prev_link) >= 0.9 for prev_link in links):
                         links.add(link)
-                        counter_object.add_scraped_url(link)
-                        print(f'Linked added successfully! {link}')
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
