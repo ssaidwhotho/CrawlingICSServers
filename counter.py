@@ -31,12 +31,12 @@ class CounterObject:
             "we'll", "we're", "we've", 'were', "weren't", 'what', "what's", 'when',
             "when's", 'where', "where's", 'which', 'while', 'who', "who's", 'whom', 'why',
             "why's", 'with', "won't", 'would', "wouldn't", 'you', "you'd", "you'll",
-            "you're", "you've", 'your', 'yours', 'yourself', 'yourselves']
-        # try:
-        #     self.load_data()
-        # except FileNotFoundError:
-        #     # create the json
-        #     self.save_json()
+            "you're", "you've", 'your', 'yours', 'yourself', 'yourselves', '.']
+        try:
+            self.load_data()
+        except FileNotFoundError:
+            # create the json
+            self.save_json()
 
     def add_new_page(self, url):
         """Adds a new page to the counter object and writes the data to a file."""
@@ -47,26 +47,27 @@ class CounterObject:
     def save_json(self):
         with open("allInfo.json", "w+") as f1:
             json.dump({
-                'Unique Pages: ': self.unique_pages,
-                'Longest Page: ': self.longest_page,
-                '50 Most Common Words: ': self.get_50_most_common_words(),
-                'ICS Subdomains: ': self.ics_subdomains,
-                'Word Count: ': self.word_count,
-                'Hashed Dict: ': self._hasher.get_all_hashes(),
-                'Documents: ': self.documents}, f1)
+                'unique_pages': self.unique_pages,
+                'longest_page': self.longest_page,
+                '50_MCW': self.get_50_most_common_words(),
+                'ICS_subdomains': self.ics_subdomains,
+                'word_count': self.word_count,
+                'hashed_dict': self._hasher.get_all_hashes(),
+                'docs': self.documents}, f1)
 
-    # def load_data(self):
-    #     """Loads any existing data from a JSON file"""
-    #     with open("allInfo.json", 'r+') as file:
-    #         data = json.load(file)
-    #         self.word_count = data.get('Word Count: ',{})
-    #         self.unique_pages = data.get('Unique Pages: ', {})
-    #         self.ics_subdomains = data.get('ICS Subdomains: ', {})
-    #         self.documents = data.get('Documents: ', {})
-    #         self.longest_page = data.get('Longest Page: ', {})
-    #         temp_dict = data.get('Hashed Dict: ', {})
+    def load_data(self):
+        """Loads any existing data from a JSON file"""
+        with open("allInfo.json", 'r+') as file:
+            data = json.load(file)
+            self.unique_pages = data.get('unique_pages', 0)
+            self.ics_subdomains = data.get('ICS_subdomains', {})
+            self.longest_page = data.get('longest_page', (None, 0))
+            self.longest_page = tuple(self.longest_page)
+            self.word_count = data.get('word_count', {})
+            temp_dict = data.get('hashed_dict', {})
+            self.documents = data.get('docs', [])
 
-    #     self._hasher.update_dict(temp_dict)
+        self._hasher.update_dict(temp_dict)
 
     def increment_unique_pages(self):
         self.unique_pages += 1
