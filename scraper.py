@@ -7,14 +7,14 @@ from bs4 import BeautifulSoup
 from ssl import SSLCertVerificationError
 
 TEN_MB = 10 * 1024 * 1024
-WORD_REGEX = re.compile(r"\b[a-zA-Z\’'.]+\b")
+WORD_REGEX = re.compile(r"\b[a-zA-Z\’'.0-9]+\b")
 
 
 def save_page_data(resp, counter_object) -> None:
     # Save data for server statistics
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     text = soup.get_text()
-    words = WORD_REGEX.findall(text.lower())
+    words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
     word_count = len(words)  # Increment the word count
     counter_object.add_new_page(resp.url)
     counter_object.increment_words(words)
@@ -73,7 +73,7 @@ def too_similar(resp, counter_object) -> bool:
     for script in soup(["script", "style"]):
         script.decompose()
     text = ' '.join(soup.stripped_strings)
-    words = WORD_REGEX.findall(text.lower())
+    words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
     word_dict = counter_object.get_all_words(words)
     # hash all words
     hash_dict = {word: counter_object.hasher(word) for word in word_dict.keys()}
@@ -115,17 +115,13 @@ def extract_next_links(url, resp) -> list:
                 print("\n\nit's too big tbh\n\nß")
                 return []
 
-            # TODO: find what's not enough textual information?
-
             # Extract the links from the page
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
                     link = urljoin(resp.url, link)
-                    # check if valid link and if similar to any link
-                    if link in links:
-                        continue
-                    if is_valid(link) and not any(similarity_score(link, prev_link) >= 0.9 for prev_link in links):
+                    # check if valid link
+                    if link not in links and is_valid(link):
                         links.add(link)
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
