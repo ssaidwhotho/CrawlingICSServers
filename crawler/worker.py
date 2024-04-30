@@ -47,9 +47,9 @@ class Worker(Thread):
                 self.logger.info("Frontier is empty. Stopping Crawler.")
                 break
             resp = download(tbd_url, self.config, self.logger)
-            # lock here if multi-threading
             with self.lock:
                 similar = scraper.too_similar(resp, self.counter_object)
+            # keep getting urls from frontier until we get a unique one
             while similar:
                 tbd_url = self.frontier.get_tbd_url()
                 if not tbd_url:
@@ -65,9 +65,8 @@ class Worker(Thread):
             if len(scraped_urls) > 0:
                 with self.lock:
                     self.counter_object.increment_unique_pages()
+                    scraper.count_if_ics_subdomain(resp, self.counter_object)
                     scraper.save_page_data(resp, self.counter_object)
-                # lock here if multi-threading
-                # with self.lock:
                 for scraped_url in scraped_urls:
                     self.frontier.add_url(scraped_url)
                 self.frontier.mark_url_complete(tbd_url)
