@@ -1,4 +1,5 @@
 from utils.hasher import Hash
+from threading import RLock
 import json
 
 
@@ -8,6 +9,7 @@ class CounterObject:
         self.unique_pages = 0
         self.ics_subdomains = {}
         self.word_count = {}
+        self.lock = RLock()
         self.longest_page = (None, 0)
         self._hasher = Hash()
         self.documents = list()
@@ -40,70 +42,71 @@ class CounterObject:
 
     def add_new_page(self, url):
         """Adds a new page to the counter object and writes the data to a file."""
-        if url not in self.all_page_data:
-            self.all_page_data.add(url)
-            self.save_json()
+        with self.lock:
+            if url not in self.all_page_data:
+                self.all_page_data.add(url)
+                self.save_json()
 
     def save_json(self):
-        with open("allInfo.json", "w+") as f1:
-            json.dump({
-                'unique_pages': self.unique_pages,
-                'longest_page': self.longest_page,
-                '50_MCW': self.get_50_most_common_words(),
-                'ICS_subdomains': self.ics_subdomains,
-                'word_count': self.word_count,
-                'hashed_dict': self._hasher.get_all_hashes(),
-                'docs': self.documents}, f1)
+        """Saves the data to a JSON file"""
+        with self.lock:
+            with open("allInfo.json", "w+") as f1:
+                json.dump({
+                    'unique_pages': self.unique_pages,
+                    'longest_page': self.longest_page,
+                    '50_MCW': self.get_50_most_common_words(),
+                    'ICS_subdomains': self.ics_subdomains,
+                    'word_count': self.word_count,
+                    'hashed_dict': self._hasher.get_all_hashes(),
+                    'docs': self.documents}, f1)
 
     def load_data(self):
         """Loads any existing data from a JSON file"""
-        with open("allInfo.json", 'r+') as file:
-            data = json.load(file)
-            self.unique_pages = data.get('unique_pages', 0)
-            self.ics_subdomains = data.get('ICS_subdomains', {})
-            self.longest_page = data.get('longest_page', (None, 0))
-            self.longest_page = tuple(self.longest_page)
-            self.word_count = data.get('word_count', {})
-            temp_dict = data.get('hashed_dict', {})
-            self.documents = data.get('docs', [])
+        with self.lock:
+            with open("allInfo.json", 'r+') as file:
+                data = json.load(file)
+                self.unique_pages = data.get('unique_pages', 0)
+                self.ics_subdomains = data.get('ICS_subdomains', {})
+                self.longest_page = data.get('longest_page', (None, 0))
+                self.longest_page = tuple(self.longest_page)
+                self.word_count = data.get('word_count', {})
+                temp_dict = data.get('hashed_dict', {})
+                self.documents = data.get('docs', [])
 
-        self._hasher.update_dict(temp_dict)
+            self._hasher.update_dict(temp_dict)
 
     def increment_unique_pages(self):
-        self.unique_pages += 1
+        with self.lock:
+            self.unique_pages += 1
 
     def increment_ics_subdomains(self, subdomain):
-        if subdomain in self.ics_subdomains:
-            self.ics_subdomains[subdomain] += 1
-        else:
-            self.ics_subdomains[subdomain] = 1
+        with self.lock:
+            if subdomain in self.ics_subdomains:
+                self.ics_subdomains[subdomain] += 1
+            else:
+                self.ics_subdomains[subdomain] = 1
 
     def increment_word(self, word):
-        if word in self.word_count:
-            self.word_count[word] += 1
-        else:
-            self.word_count[word] = 1
-
-    def increment_words(self, words):
-        for word in words:
+        with self.lock:
             if word in self.word_count:
                 self.word_count[word] += 1
             else:
                 self.word_count[word] = 1
 
+    def increment_words(self, words):
+        for word in words:
+            with self.lock:
+                self.increment_word(word)
+
     def remove_stopwords(self):
-        for word in self.stopwords:
-            if word in self.word_count:
-                del self.word_count[word]
+        with self.lock:
+            for word in self.stopwords:
+                if word in self.word_count:
+                    del self.word_count[word]
 
     def set_longest_page(self, url, word_count):
-        self.longest_page = (url, word_count)
-
-    def get_prev_urls(self):
-        return self.all_page_data.keys()
-
-    def get_prev_url_data(self, url):
-        return self.all_page_data[url]
+        with self.lock:
+            self.longest_page = (url, word_count)
 
     def get_unique_pages(self):
         return self.unique_pages
@@ -137,15 +140,15 @@ class CounterObject:
                     word_dict[word] = 1
         return word_dict
 
-    def compare_bits(self, bit_str: str, url) -> bool:
+    def compare_bits(self, bit_str: str) -> bool:
         """
         Compares the content of the current document to the content of the other documents via bits
         :param bit_str: string of bits for easy document storage
         :return: bool if the document is similar to another document
         """
         if len(self.documents) == 0:
-            # inital case and add reversed bits
-            self.documents.append(bit_str)
+            with self.lock:
+                self.documents.append(bit_str)
             return False
         else:
             for other_bit_str in self.documents:
@@ -158,10 +161,13 @@ class CounterObject:
                 # If the similarity ratio is greater than or equal to 0.9, return True
                 if similarity_ratio >= 0.9:
                     return True
-            self.documents.append(bit_str)
+            # If the document is not similar to any other document, add the bits
+            with self.lock:
+                self.documents.append(bit_str)
             return False
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word
-        self.remove_stopwords()
-        return dict(sorted(self.word_count.items(), key=lambda item: item[1], reverse=True)[:50])
+        with self.lock:
+            self.remove_stopwords()
+            return dict(sorted(self.word_count.items(), key=lambda item: item[1], reverse=True)[:50])
