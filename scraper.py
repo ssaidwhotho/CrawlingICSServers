@@ -101,7 +101,7 @@ def scraper(url, resp) -> list:
     links = extract_next_links(url, resp)
     if not links:
         return []
-    links = list(set(urldefrag(link).url for link in links))  # defraged url!
+    # links = list(set(urldefrag(link).url for link in links))  # defraged url!
     return links
 
 
@@ -119,7 +119,7 @@ def extract_next_links(url, resp) -> list:
             for tag in soup.find_all():
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
-                    link = urljoin(resp.url, link)
+                    link = urldefrag(urljoin(resp.url, link)).url
                     # check if valid link
                     if link not in links and is_valid(link):
                         links.add(link)
