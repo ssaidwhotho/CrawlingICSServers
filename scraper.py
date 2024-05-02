@@ -9,17 +9,18 @@ TEN_MB = 10 * 1024 * 1024
 WORD_REGEX = re.compile(r"\b[a-zA-Z\’'.0-9]+\b")
 
 
-def get_text(resp) -> str:
+def get_text(resp) -> list:
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     for script in soup(["script", "style"]):
         script.decompose()
-    return ' '.join(soup.stripped_strings)
+    text = ' '.join(soup.stripped_strings)
+    all_words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
+    return all_words
 
 
 def save_page_data(resp, counter_object) -> None:
     # Save data for server statistics
-    text = get_text(resp)
-    words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
+    words = get_text(resp)
     word_count = len(words)  # Increment the word count
     counter_object.add_new_page(resp.url)
     counter_object.increment_words(words)
@@ -36,7 +37,7 @@ def count_if_ics_subdomain(resp, counter_object) -> None:
         counter_object.increment_ics_subdomains(parsed.netloc)
 
 
-def can_parse(url) -> bool:
+def can_parse(url) -> tuple[bool, list | None]:
     """
     Gets the url and checks its robot.txt to see if we are allowed to crawl :emoji_face:
 
@@ -47,18 +48,17 @@ def can_parse(url) -> bool:
     allowed_net_locs = ["ics.uci.edu", ".cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
     try:
         parsed_url = urlparse(url)
-
         if not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs):
             if not parsed_url.netloc.startswith("cs.uci.edu"):  # special case for eecs, cecs, etc.
-                return False
+                return False, None
         robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
         robot_parse = RobotParser()
         robot_parse.set_url(robots_url)
         robot_parse.read()
-        return robot_parse.can_fetch("*", url)
+        return robot_parse.can_fetch("*", url), robot_parse.site_maps()
     except (URLError, SSLCertVerificationError) as e:
         print(f"\n\ni errored {e}\n\n")
-        return False
+        return False, None
 
 
 def too_similar(resp, counter_object) -> bool:
@@ -66,7 +66,7 @@ def too_similar(resp, counter_object) -> bool:
     Checks if the page is too similar to another page
     :param resp:
     :param counter_object:
-    :return:
+    :return: bool
     """
     # takes out the script and style tags
     if resp.error is not None:
@@ -74,8 +74,7 @@ def too_similar(resp, counter_object) -> bool:
     else:
         if resp.status >= 300 or resp.status < 200:
             return False
-    text = get_text(resp)
-    words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
+    words = get_text(resp)
     word_dict = counter_object.get_all_words(words)
     # hash all words
     hash_dict = {word: counter_object.hasher(word) for word in word_dict.keys()}
@@ -112,12 +111,14 @@ def extract_next_links(url, resp) -> list:
         if 200 <= resp.status < 300:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
-            if len(resp.raw_response.content) > TEN_MB:  # Check if the page is too big
+            total_words = get_text(resp)
+            unique_words = set(total_words)
+
+            if len(total_words) > TEN_MB:  # Check if the page is too big
                 print("\n\nit's too big tbh\n\n")
                 return []
 
-            text = soup.get_text().split()
-            if len(text) < 100:  # low textual information
+            if len(unique_words) < 100:  # low textual information
                 print("\n\nnot enough text\n\n")
                 return []
 
@@ -127,7 +128,12 @@ def extract_next_links(url, resp) -> list:
                     link = tag['href'].lower()
                     link = urldefrag(urljoin(resp.url, link)).url
                     # check if valid link
-                    if link not in links and is_valid(link):
+                    if link in links or not link:
+                        continue
+                    valid, sitemap = can_parse(link)  # robots.txt check
+                    if valid and is_valid(link):
+                        if sitemap is not None and sitemap not in links:
+                            links.add(sitemap)
                         links.add(link)
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
@@ -164,7 +170,6 @@ def is_valid(url) -> bool:
                 + r"|rm|smil|wmv|swf|wma|zip|rar|gz|php|json)$", parsed.path.lower()):
             return False
         else:
-            return can_parse(url)
-
+            return True
     except TypeError or URLError:
         print("TypeError for ", parsed)
