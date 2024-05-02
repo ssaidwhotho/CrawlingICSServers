@@ -76,7 +76,6 @@ class Frontier(object):
     def add_url(self, url):
         with self.lock:
             url = normalize(url)
-            # check similarity of url to previously visited urls via levenstein distance
             urlhash = get_urlhash(url)
             if urlhash not in self.save:
                 self.save[urlhash] = (url, False)
