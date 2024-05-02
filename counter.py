@@ -122,7 +122,8 @@ class CounterObject:
         return self.word_count
 
     def get_longest_page_count(self):
-        return self.longest_page[1]
+        with self.lock:
+            return self.longest_page[1]
 
     def hasher(self, word):
         return self._hasher.get_hash(word)
