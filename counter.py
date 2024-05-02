@@ -147,25 +147,24 @@ class CounterObject:
         :param bit_str: string of bits for easy document storage
         :return: bool if the document is similar to another document
         """
-        if len(self.documents) == 0:
-            with self.lock:
+        with self.lock:
+            if len(self.documents) == 0:
                 self.documents.append(bit_str)
-            return False
-        else:
-            for other_bit_str in self.documents:
-                count = 0
-                for bit1, bit2 in zip(bit_str, other_bit_str):
-                    if bit1 == bit2:
-                        # If bits are equivalent, increment count
-                        count += 1
-                similarity_ratio = count / 64
-                # If the similarity ratio is greater than or equal to 0.9, return True
-                if similarity_ratio >= 0.9:
-                    return True
-            # If the document is not similar to any other document, add the bits
-            with self.lock:
+                return False
+            else:
+                for other_bit_str in self.documents:
+                    count = 0
+                    for bit1, bit2 in zip(bit_str, other_bit_str):
+                        if bit1 == bit2:
+                            # If bits are equivalent, increment count
+                            count += 1
+                    similarity_ratio = count / 64
+                    # If the similarity ratio is greater than or equal to 0.9, return True
+                    if similarity_ratio >= 0.9:
+                        return True
+                # If the document is not similar to any other document, add the bits
                 self.documents.append(bit_str)
-            return False
+                return False
 
     def get_50_most_common_words(self):
         # Returns a sorted dict starting from the most common word
