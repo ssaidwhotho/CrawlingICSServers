@@ -1,5 +1,4 @@
 import re
-from utils import similarity_score
 from urllib.parse import urlparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
 from urllib.error import URLError
@@ -10,10 +9,16 @@ TEN_MB = 10 * 1024 * 1024
 WORD_REGEX = re.compile(r"\b[a-zA-Z\’'.0-9]+\b")
 
 
+def get_text(resp) -> str:
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+    for script in soup(["script", "style"]):
+        script.decompose()
+    return ' '.join(soup.stripped_strings)
+
+
 def save_page_data(resp, counter_object) -> None:
     # Save data for server statistics
-    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-    text = soup.get_text()
+    text = get_text(resp)
     words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
     word_count = len(words)  # Increment the word count
     counter_object.add_new_page(resp.url)
@@ -69,10 +74,7 @@ def too_similar(resp, counter_object) -> bool:
     else:
         if resp.status >= 300 or resp.status < 200:
             return False
-    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-    for script in soup(["script", "style"]):
-        script.decompose()
-    text = ' '.join(soup.stripped_strings)
+    text = get_text(resp)
     words = [match.group() for match in WORD_REGEX.finditer(text.lower()) if match.group() != '.']
     word_dict = counter_object.get_all_words(words)
     # hash all words
@@ -101,7 +103,6 @@ def scraper(url, resp) -> list:
     links = extract_next_links(url, resp)
     if not links:
         return []
-    # links = list(set(urldefrag(link).url for link in links))  # defraged url!
     return links
 
 
@@ -112,11 +113,16 @@ def extract_next_links(url, resp) -> list:
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
             if len(resp.raw_response.content) > TEN_MB:  # Check if the page is too big
-                print("\n\nit's too big tbh\n\nß")
+                print("\n\nit's too big tbh\n\n")
+                return []
+
+            text = soup.get_text().split()
+            if len(text) < 100:  # low textual information
+                print("\n\nnot enough text\n\n")
                 return []
 
             # Extract the links from the page
-            for tag in soup.find_all():
+            for tag in soup.find_all('a'):
                 if 'href' in tag.attrs:
                     link = tag['href'].lower()
                     link = urldefrag(urljoin(resp.url, link)).url
