@@ -74,10 +74,10 @@ class Frontier(object):
                 return None
 
     def add_url(self, url):
-        with self.lock:
-            url = normalize(url)
-            urlhash = get_urlhash(url)
-            if urlhash not in self.save:
+        url = normalize(url)
+        urlhash = get_urlhash(url)
+        if urlhash not in self.save:
+            with self.lock:
                 self.save[urlhash] = (url, False)
                 self.save.sync()
                 self.to_be_downloaded.append(url)
