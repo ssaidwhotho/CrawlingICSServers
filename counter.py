@@ -45,6 +45,7 @@ class CounterObject:
         with self.lock:
             if url not in self.all_page_data:
                 self.all_page_data.add(url)
+                self.increment_unique_pages()
                 if self.unique_pages % 50 == 0: # save every 50 pages
                     self.save_json()
 

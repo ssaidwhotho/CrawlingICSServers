@@ -60,7 +60,6 @@ class Worker(Thread):
                     f"using cache {self.config.cache_server}.")
             scraped_urls = scraper.scraper(tbd_url, resp)
             if len(scraped_urls) > 0:
-                self.counter_object.increment_unique_pages()
                 scraper.count_if_ics_subdomain(resp, self.counter_object)
                 scraper.save_page_data(resp, self.counter_object)
                 for scraped_url in scraped_urls:

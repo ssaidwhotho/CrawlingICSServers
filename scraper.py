@@ -1,4 +1,5 @@
 import re
+from http.client import InvalidURL
 from urllib.parse import urlparse, urljoin, urldefrag
 from urllib.robotparser import RobotFileParser as RobotParser
 from urllib.error import URLError
@@ -33,7 +34,7 @@ def save_page_data(resp, counter_object) -> None:
 def count_if_ics_subdomain(resp, counter_object) -> None:
     # Count the number of pages that are in the ics subdomain
     parsed = urlparse(resp.url)
-    if parsed.netloc.endswith("ics.uci.edu"):
+    if parsed.netloc.endswith(".ics.uci.edu"):
         counter_object.increment_ics_subdomains(parsed.netloc)
 
 
@@ -45,18 +46,14 @@ def can_parse(url) -> tuple[bool, list | None]:
     :return: bool of whether the crawler is allowed to search the url
 
     """
-    allowed_net_locs = ["ics.uci.edu", ".cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
     try:
         parsed_url = urlparse(url)
-        if not any(net_loc in parsed_url.netloc for net_loc in allowed_net_locs):
-            if not parsed_url.netloc.startswith("cs.uci.edu"):  # special case for eecs, cecs, etc.
-                return False, None
         robots_url = f"{parsed_url.scheme}://{parsed_url.netloc}/robots.txt"
         robot_parse = RobotParser()
         robot_parse.set_url(robots_url)
         robot_parse.read()
         return robot_parse.can_fetch("*", url), robot_parse.site_maps()
-    except (URLError, SSLCertVerificationError) as e:
+    except (URLError, SSLCertVerificationError, InvalidURL) as e:
         print(f"\n\ni errored {e}\n\n")
         return False, None
 
@@ -130,11 +127,13 @@ def extract_next_links(url, resp) -> list:
                     # check if valid link
                     if link in links or not link:
                         continue
-                    valid, sitemap = can_parse(link)  # robots.txt check
-                    if valid and is_valid(link):
-                        if sitemap is not None and sitemap not in links:
-                            links.add(sitemap)
-                        links.add(link)
+                    if is_valid(link):
+                        valid, sitemaps = can_parse(link)  # robots.txt check
+                        if valid:
+                            if sitemaps:
+                                for sitemap in sitemaps:
+                                    links.add(sitemap) if is_valid(sitemap) else None
+                            links.add(link)
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
@@ -148,7 +147,11 @@ def is_valid(url) -> bool:
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
     try:
+        allowed_net_locs = ["ics.uci.edu", ".cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
         parsed = urlparse(url)
+        if not any(net_loc in parsed.netloc for net_loc in allowed_net_locs):
+            if not parsed.netloc.startswith("cs.uci.edu"): # edge case for cs.uci.edu since eecs is valid
+                return False
         if parsed.scheme not in {"http", "https"}:
             return False
         if 'embed' in parsed.path.lower():  # Check if 'embed?url' is present in the query string

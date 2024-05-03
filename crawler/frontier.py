@@ -62,7 +62,7 @@ class Frontier(object):
 
                 domain = urlparse(random_file).netloc
                 for domain_key in self.checking.keys():
-                    if domain_key in domain:
+                    if domain_key == domain or domain.endswith("." + domain_key):
                         domain = domain_key
                         break
                 if self.checking[domain]:
@@ -94,7 +94,7 @@ class Frontier(object):
             # set domain for checking
             domain = urlparse(url).netloc
             for domain_key in self.checking.keys():
-                if domain_key in domain and self.checking[domain_key]:
+                if domain_key == domain or domain.endswith("." + domain_key):
                     self.checking[domain_key] = False
                     break
             self.save.sync()
