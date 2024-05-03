@@ -95,7 +95,7 @@ def too_similar(resp, counter_object) -> bool:
     bit_rep = [1 if nums > 0 else 0 for nums in summed_hashes]
     bit_str = ''.join(map(str, bit_rep))
 
-    return counter_object.compare_bits(bit_str, resp)
+    return counter_object.compare_bits(bit_str)
 
 
 def scraper(url, resp) -> list:
