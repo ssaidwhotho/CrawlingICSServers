@@ -134,6 +134,10 @@ def extract_next_links(url, resp) -> list:
                                 for sitemap in sitemaps:
                                     links.add(sitemap) if is_valid(sitemap) else None
                             links.add(link)
+                        else:
+                            print(f"Disallowed by robots.txt: {link}")
+                    else:
+                        print(f"Invalid link: {link}")
         else:
             print(f'Error: Unexpected HTTP status code {resp.status} for URL {url}')
     else:
