@@ -65,9 +65,12 @@ class Frontier(object):
                     if domain_key == domain or domain.endswith("." + domain_key):
                         domain = domain_key
                         break
-                if self.checking[domain]:
-                    time.sleep(self.config.time_delay)
-                self.checking[domain] = True
+                try:
+                    if self.checking[domain]:
+                        time.sleep(self.config.time_delay)
+                    self.checking[domain] = True
+                except KeyError:
+                    print("this should not happen but continue")
 
                 return random_file
             except IndexError:
